@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <title>Xóa Bloatware</title>
+  <style>
+    body { font-family:"Segoe UI",sans-serif; padding:10px 25px; font-size:14px; background:#f0f0f0; }
+    .container { background:#fff; padding:20px; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,.1); }
+    .app-list { display:grid; grid-template-columns: 1fr 1fr; gap:10px; padding:10px; border:1px solid #ddd; border-radius:4px; min-height:140px; }
+    .app-item { display:flex; align-items:center; line-height:1.5; }
+    .app-item input { margin-right:10px; }
+    .app-item-disabled { color:#aaa; cursor:not-allowed; }
+    .app-item-disabled input { cursor:not-allowed; }
+    .footer { text-align:center; margin-top:20px; }
+    button { padding:10px 25px; border:none; background:#d9534f; color:#fff; border-radius:4px; cursor:pointer; font-weight:600; font-size:1em; }
+    button:hover { background:#c9302c; }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body>
+  <div class="container">
+    <h1 style="text-align:center;">Xóa Bloatware</h1>
+    <p>Chọn các ứng dụng mặc định đi kèm Windows mà bạn muốn gỡ bỏ. Các mục bị làm mờ là những ứng dụng không được tìm thấy trên máy.</p>
+    <div id="app-list-container" class="app-list"></div>
+    <div class="footer">
+      <button id="proceed-btn">Gỡ bỏ</button>
+    </div>
+  </div>
+
+  <script>
+  /** Chỉ Appx/Store apps đi kèm Windows (KHÔNG kiểm tra desktop apps) */
+  const APPS = [
+    {key:'3dviewer',  name:'3D Viewer',                     patterns:['Microsoft.Microsoft3DViewer']},
+    {key:'bingsearch',name:'Bing Search',                   patterns:['Microsoft.BingSearch']},
+    {key:'calculator',name:'Calculator',                    patterns:['Microsoft.WindowsCalculator']},
+    {key:'camera',    name:'Camera',                        patterns:['Microsoft.WindowsCamera']},
+    {key:'clipchamp', name:'Clipchamp',                     patterns:['Clipchamp.Clipchamp']},
+    {key:'cortana',   name:'Cortana',                       patterns:['Microsoft.549981C3F5F10']},
+    {key:'devhome',   name:'Dev Home',                      patterns:['Microsoft.Windows.DevHome']},
+    {key:'family',    name:'Family',                        patterns:['MicrosoftCorporationII.MicrosoftFamily']},
+    {key:'feedback',  name:'Feedback Hub',                  patterns:['Microsoft.WindowsFeedbackHub']},
+    {key:'gameassist',name:'Game Assist',                   patterns:['Microsoft.Edge.GameAssist']},
+
+    {key:'gethelp',   name:'Get Help',                      patterns:['Microsoft.GetHelp']},
+    {key:'getstarted',name:'Tips (Get started)',            patterns:['Microsoft.Getstarted']},
+    {key:'mailcal',   name:'Mail and Calendar/Outlook (UWP/Store)', patterns:['microsoft.windowscommunicationsapps','Microsoft.OutlookForWindows']},
+    {key:'maps',      name:'Maps',                          patterns:['Microsoft.WindowsMaps']},
+    {key:'mixedrl',   name:'Mixed Reality Portal',          patterns:['Microsoft.MixedReality.Portal']},
+    {key:'news',      name:'News',                          patterns:['Microsoft.BingNews']},
+    {key:'notepad',   name:'Notepad (modern)',              patterns:['Microsoft.WindowsNotepad']},
+    {key:'officehub', name:'Office 365 (Hub)',              patterns:['Microsoft.MicrosoftOfficeHub']},  // KHÔNG phải Office 2024
+    {key:'onenote',   name:'OneNote (Store)',               patterns:['Microsoft.Office.OneNote']},
+
+    {key:'paint',     name:'Paint',                         patterns:['Microsoft.Paint','Microsoft.MSPaint','Microsoft.Windows.MSPaint']},
+    {key:'people',    name:'People',                        patterns:['Microsoft.People']},
+    {key:'photos',    name:'Photos',                        patterns:['Microsoft.Windows.Photos']},
+    {key:'powerauto', name:'Power Automate Desktop',        patterns:['Microsoft.PowerAutomateDesktop']},
+    {key:'quickassist',name:'Quick Assist',                 patterns:['MicrosoftCorporationII.QuickAssist','App.Support.QuickAssist']},
+    {key:'skype',     name:'Skype',                         patterns:['Microsoft.SkypeApp']},
+    {key:'screensketch',name:'Snip & Sketch (legacy)',      patterns:['Microsoft.ScreenSketch']},
+    {key:'solitaire', name:'Solitaire Collection',          patterns:['Microsoft.MicrosoftSolitaireCollection']},
+    {key:'stickynotes',name:'Sticky Notes',                 patterns:['Microsoft.MicrosoftStickyNotes']},
+    {key:'teams',     name:'Teams (Store/MSIX)',            patterns:['MSTeams','MicrosoftTeams','Microsoft.Teams']},
+    {key:'todo',      name:'To Do',                         patterns:['Microsoft.Todos']},
+    {key:'soundrec',  name:'Voice Recorder',                patterns:['Microsoft.WindowsSoundRecorder']},
+    {key:'wallet',    name:'Wallet',                        patterns:['Microsoft.Wallet']},
+    {key:'weather',   name:'Weather',                       patterns:['Microsoft.BingWeather']},
+    {key:'terminal',  name:'Windows Terminal',              patterns:['Microsoft.WindowsTerminal']},
+
+    {key:'xbox_app',  name:'Xbox App',                      patterns:['Microsoft.XboxApp']},
+    {key:'xbox_tcui', name:'Xbox TCUI',                     patterns:['Microsoft.Xbox.TCUI']},
+    {key:'xbox_gameoverlay', name:'Xbox Game Overlay',      patterns:['Microsoft.XboxGameOverlay','Microsoft.XboxGamingOverlay']},
+    {key:'xbox_identity', name:'Xbox Identity Provider',    patterns:['Microsoft.XboxIdentityProvider']},
+    {key:'xbox_stt',  name:'Xbox Speech To Text Overlay',   patterns:['Microsoft.XboxSpeechToTextOverlay']},
+    {key:'gamingapp', name:'Gaming App (Xbox)',             patterns:['Microsoft.GamingApp']},
+
+    {key:'yourphone', name:'Phone Link (Your Phone)',       patterns:['Microsoft.YourPhone']},
+    {key:'zunemusic', name:'Zune Music (Groove legacy)',    patterns:['Microsoft.ZuneMusic']},
+    {key:'zunevideo', name:'Zune Video (Movies & TV)',      patterns:['Microsoft.ZuneVideo']}
+  ];
+
+  /* ===================== CORE LOGIC ===================== */
+  let INSTALLED = [];  // Appx: [{Name, PackageFamilyName}]
+
+  // Regex an toàn cho wildcard
+  function wildcardToRegExp(pat){
+    try {
+      const esc = s => s.replace(/([.+^${}()|[\]\\])/g,'\\$1'); // giữ nguyên * và ?
+      let re = esc(pat); re = re.replace(/\*/g,'.*').replace(/\?/g,'.');
+      return new RegExp('^' + re + '$','i');
+    } catch(e) { console.error('Regex build fail:', pat, e); return /^$/; }
+  }
+  const hasWildcard = s => /[*?]/.test(s);
+
+  // So khớp 1 pattern với 1 record Appx
+  function matchPatternAgainstAppx(pat, rec){
+    const n = rec.Name || '', pfn = rec.PackageFamilyName || '';
+    if (hasWildcard(pat)) {
+      const re = wildcardToRegExp(pat);
+      return re.test(n) || re.test(pfn);
+    }
+    // Không wildcard → so CHÍNH XÁC
+    return n === pat || pfn === pat;
+  }
+
+  // App có tồn tại?
+  function isInstalledAppx(app){
+    return app.patterns.some(pat => INSTALLED.some(rec => matchPatternAgainstAppx(pat, rec)));
+  }
+
+  function renderList(){
+    const box = document.getElementById('app-list-container');
+    box.innerHTML = '';
+    APPS.sort((a,b)=>a.name.localeCompare(b.name,'vi')).forEach(app=>{
+      const row = document.createElement('div'); row.className='app-item';
+      const cb  = document.createElement('input'); cb.type='checkbox'; cb.id=app.key; cb.value=app.patterns[0];
+      const lb  = document.createElement('label'); lb.htmlFor=app.key; lb.textContent = app.name;
+
+      const hasAppx = isInstalledAppx(app);
+      if (!hasAppx) { cb.disabled = true; row.classList.add('app-item-disabled'); }
+
+      row.appendChild(cb); row.appendChild(lb);
+      box.appendChild(row);
+    });
+  }
+
+  async function refreshInstalled(){
+    const box = document.getElementById('app-list-container');
+    box.innerHTML = '<p>Đang kiểm tra các ứng dụng đã cài đặt...</p>';
+
+    const res = await window.electronAPI.getInstalledApps().catch(()=>null);
+    if (res?.success && res.data) {
+      try { INSTALLED = JSON.parse(res.data); } catch { INSTALLED = []; }
+    } else { INSTALLED = []; }
+
+    renderList();
+  }
+
+  document.addEventListener('DOMContentLoaded', refreshInstalled);
+
+  // Gỡ Appx đã chọn và refresh
+  document.getElementById('proceed-btn').addEventListener('click', async () => {
+    const patterns = [...document.querySelectorAll('#app-list-container input[type="checkbox"]:checked')].map(i=>i.value);
+    if (patterns.length === 0) {
+      Swal.fire('Chưa chọn ứng dụng','Vui lòng chọn ít nhất một ứng dụng để gỡ bỏ.','info'); return;
+    }
+    const ok = await Swal.fire({title:'Bạn có chắc chắn?', text:`Sẽ gỡ ${patterns.length} ứng dụng cho mọi người dùng.`, icon:'warning', showCancelButton:true, confirmButtonText:'Vẫn gỡ bỏ', cancelButtonText:'Hủy'});
+    if (!ok.isConfirmed) return;
+
+    Swal.fire({title:'Đang gỡ bỏ...', allowOutsideClick:false, didOpen:()=>Swal.showLoading()});
+    const rs = await window.electronAPI.removeBloatware(patterns).catch(()=>({success:false}));
+    Swal.close();
+    if (rs && rs.success) {
+      await refreshInstalled(); // chạy lại Bước 1 sau khi gỡ
+      Swal.fire('Hoàn tất!','Đã gỡ các ứng dụng đã chọn.','success');
+    } else {
+      Swal.fire('Có lỗi', (rs && rs.message) || 'Unknown error','error');
+    }
+  });
+  </script>
+</body>
+</html>

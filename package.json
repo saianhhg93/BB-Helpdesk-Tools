@@ -1,0 +1,34 @@
+{
+  "name": "bb-helpdesk-tools",
+  "version": "1.0.0",
+  "description": "Phần mềm hỗ trợ tinh chỉnh, sao lưu và phục hồi hệ thống",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder" 
+  },
+  "author": "Bảo Béo",
+  "license": "ISC",
+  "devDependencies": {
+    "electron": "^31.0.2",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.baobeo.bbhelpdesktools",
+    "productName": "BB Helpdesk Tools",
+        "extraResources": [
+      {
+        "from": "resources/",
+        "to": "resources",
+        "filter": [
+          "**/*"
+        ]
+      },
+      { "from": "icon.ico",   "to": "icon.ico" }
+    ],
+    "win": {
+      "target": "portable",
+      "icon": "icon.ico" 
+    }
+  }
+}

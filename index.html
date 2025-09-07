@@ -1,0 +1,1005 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BB Helpdesk Tools</title>
+    <style>
+        html, body { height: 100%; margin: 0; font-family: "Segoe UI", Arial, sans-serif; background-color: #f4f4f4; }
+        body { display: flex; justify-content: center; align-items: center; overflow: hidden; }
+        .container { max-width: 700px; width: 100%; margin: 20px; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        .section { border: 1px solid #e0e0e0; padding: 15px; margin-bottom: 20px; border-radius: 8px; }
+        .section-title { font-weight: 600; font-size: 1.1em; color: #d9534f; margin-bottom: 15px; display: flex; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        .section-title::before { content: '📋'; margin-right: 8px; font-size: 1.2em; }
+        .button-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+        .btn { padding: 10px 15px; border: 1px solid #ccc; background-color: #f8f8f8; border-radius: 4px; cursor: pointer; text-align: left; font-size: 14px; display: flex; align-items: center; transition: background-color 0.2s, border-color 0.2s; }
+        .btn:hover { background-color: #e9e9e9; border-color: #999; }
+        .btn i { margin-right: 8px; font-style: normal; }
+        .path-selector { display: flex; gap: 10px; align-items: center; margin-bottom: 15px; flex-wrap: wrap; }
+        .path-selector label { font-weight: 600; min-width: 180px; }
+        .path-selector input[type="text"] { flex-grow: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px; min-width: 250px; }
+        .path-selector button { padding: 8px 15px; border: 1px solid #ccc; background-color: #f0f0f0; border-radius: 4px; cursor: pointer; }
+        .path-selector button:hover { background-color: #e0e0e0; }
+        .swal-title-custom { font-family: "Segoe UI", Arial, sans-serif !important; font-weight: 600; }
+        .bd-node{display:flex;align-items:center;gap:8px;margin:4px 0;}
+        .bd-node > .bd-toggle{border:1px solid #ddd;background:#f8f9fa;border-radius:4px;padding:0 4px;cursor:pointer}
+        .bd-node > .bd-spacer{display:inline-block;width:18px}
+        .bd-name{font-weight:600}
+        .meta{color:#666;font-size:12px}
+        /* ===== Tree View (Windows-like) ===== */
+        .tree { font-size:14px; line-height:1.35; }
+        .tree ul { list-style:none; margin:0; padding-left:20px; position:relative; }
+        .tree ul::before {
+          content:""; position:absolute; top:0; bottom:0; left:8px; width:1px; background:#e5e7eb;
+        }
+        .tree li { position:relative; margin:2px 0 2px 0; padding-left:20px; }
+        .tree li::before {
+          content:""; position:absolute; top:0.9em; left:8px; width:12px; height:1px; background:#e5e7eb;
+        }
+        .tree .row { display:flex; align-items:center; gap:6px; }
+        .tree .toggle {
+          width:16px; height:16px; border:1px solid #d0d5dd; background:#f8fafc; border-radius:3px;
+          font-size:12px; line-height:14px; text-align:center; cursor:pointer; user-select:none;
+        }
+        .tree .toggle[aria-expanded="true"] { background:#eef2ff; }
+        .tree .name { font-weight:600; }
+        .tree .meta { color:#666; font-size:12px; margin-left:4px; }
+        .tree .muted{ color:#999; }
+        .tree .leaf .toggle { visibility:hidden; } /* file: không có nút toggle */
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=memory" />
+</head>
+<body>
+<div class="container">
+    <div class="section">
+        <div class="section-title">Hệ thống</div>
+        <div class="button-grid">
+            <button class="btn" id="check-info-btn"><i>📄</i> Check thông tin máy</button>
+            <button class="btn" id="settings-btn"><i>🪟</i> Thiết lập Windows</button>
+            <button class="btn" id="network-settings-btn"><i>🌐</i> Thiết lập mạng</button>
+            <button class="btn" id="bloatware-btn"><i>🗑️</i> Xóa Bloatware</button>
+            <button class="btn" id="bitlocker-btn"><i>🔒</i> Tắt Bitlocker</button>
+            <button class="btn" id="activation-btn"><i>🔑</i> Kích hoạt Win - Office</button>
+        </div>
+    </div>
+    <div class="section">
+        <div class="section-title" style="color: #c9302c;">Sao lưu - Khôi phục</div>
+        <div class="path-selector"> <label for="backup-folder">Thư mục sao lưu backup:</label> <input type="text" id="backup-folder" value="D:\BB_Backup"> <button id="select-backup-btn">Chọn</button> </div>
+        <div class="button-grid"> 
+            <button class="btn" id="backup-wifi-btn"><i>📡</i> Sao lưu Wifi</button>
+            <button class="btn" id="backup-drivers-btn"><i>💻</i> Sao lưu Driver</button>
+            <button class="btn" id="backup-data-btn"><i>💾</i> Sao lưu Dữ liệu</button>
+            <button class="btn" id="backup-zalo-btn"><i>💬</i> Sao lưu Zalo</button>
+            <button class="btn" id="backup-registry-btn"><i>🗄️</i> Sao lưu Registry</button>
+            <button class="btn" id="restore-data-btn"><i>🔄</i> Khôi phục dữ liệu</button>
+        </div>
+    </div>
+</div>
+
+<script>
+  (async () => {
+    try {
+      const current = await window.electronAPI.getBackupDir();
+      const input = document.getElementById('backup-folder');
+      if (current && input) input.value = current;
+    } catch {}
+  })();
+
+  // Khi người dùng bấm "Chọn", cập nhật input và lưu lại về main process
+  document.getElementById('select-backup-btn').addEventListener('click', async () => {
+    const filePath = await window.electronAPI.openDirectory();
+    if (filePath) {
+      document.getElementById('backup-folder').value = filePath;
+      window.electronAPI.setBackupDir(filePath); // <-- thêm dòng này
+    }
+  });
+
+  // (tuỳ chọn) nếu một cửa sổ khác đổi backupDir, input tự cập nhật theo
+  window.electronAPI.onBackupDirUpdated((dir) => {
+    const input = document.getElementById('backup-folder');
+    if (input) input.value = dir;
+  });
+
+
+    document.getElementById('check-info-btn').addEventListener('click', async () => {
+        Swal.fire({ title: 'Đang thu thập thông tin...', text: 'Vui lòng đợi trong giây lát.', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
+        try {
+            const jsonString = await window.electronAPI.getSystemInfo();
+            const info = JSON.parse(jsonString);
+            
+            // Bỏ 'max-height' và 'overflow-y' để hộp thoại tự giãn ra
+            const contentHtml = `
+                <div style="text-align: left; font-family: monospace; font-size: 14px; padding: 10px; border: 1px solid #eee; border-radius: 5px;">
+                    <b>⚙️ VI XỬ LÝ (CPU)</b><br> - Tên: ${info.cpu.Name}<br> - Socket: ${info.cpu.Socket} (${info.cpu.SocketDesignation})<br> - Lõi: ${info.cpu.Cores}<br> - Luồng: ${info.cpu.Threads}<br> <hr>
+                    <b>🔌 BO MẠCH CHỦ (Motherboard)</b><br> - Tên: ${info.motherboard.Model}<br> - Version: ${info.motherboard.Version}<br> - SerialNumber: ${info.motherboard.SerialNumber}<br> - BIOS Version: ${info.motherboard.BiosVersion} (Phát hành: ${info.motherboard.BiosReleaseDate})<br> <hr>
+                    <b>💾 BỘ NHỚ (Memory)</b><br> - Khe cắm đã dùng: ${info.memory.UsedSlots} / ${info.memory.TotalSlots}<br> ${info.memory.Sticks.map((stick, index) => `&nbsp;&nbsp;[Thanh ${index + 1}] ${stick.Size}GB ${stick.Type}, ${stick.ModuleManuf}, ${stick.PartNumber}, Speed: ${stick.Speed}MHz`).join('<br>')} <br><hr>
+                    <b>🎨 CARD ĐỒ HỌA (GPU)</b><br> ${info.gpu.map(g => `- ${g.Name}`).join('<br>')}<br> <hr>
+                    <b>💿 Ổ ĐĨA (Drives)</b><br> ${info.drives.map(d => `- ${d.Model} - ${d.Size}GB (${d.Interface})`).join('<br>')}<br> <hr>
+                    <b>📀 HỆ ĐIỀU HÀNH</b><br> - Tên: ${info.os.Name}<br> - Phiên bản: ${info.os.Version}<br> <hr>
+                    <b>🌐 CARD MẠNG (Chỉ card vật lý)</b><br>
+                    ${info.network.map(n => `
+                        - ${n.Name} (${n.MacAddress || 'N/A'})<br>
+                        &nbsp;&nbsp;Status: ${n.Status} | Speed: ${n.LinkSpeed} Mbps<br>
+                        &nbsp;&nbsp;IPv4: ${n.IPv4 || 'N/A'}<br>
+                        &nbsp;&nbsp;Gateway: ${n.Gateway || 'N/A'}<br>
+                        &nbsp;&nbsp;DNS Servers: ${n.DNSServers || 'N/A'}
+                    `).join('<br><br>')}
+                </div>
+            `;
+
+            Swal.fire({
+                customClass: { title: 'swal-title-custom' },
+                title: '<strong>Thông Tin Hệ Thống</strong>',
+                icon: 'info',
+                html: contentHtml,
+                width: '700px'
+            })
+
+        } catch (error) {
+            Swal.fire({ icon: 'error', title: 'Oops...', text: 'Đã xảy ra lỗi khi lấy thông tin hệ thống!' })
+                .then(() => {
+                    window.electronAPI.resizeWindow(originalSize);
+                });
+            console.error(error);
+        }
+    });
+    document.getElementById('settings-btn').addEventListener('click', () => {
+        window.electronAPI.openSettingsWindow();
+    });
+
+    document.getElementById('network-settings-btn').addEventListener('click', () => {
+    window.electronAPI.openNetworkWindow();
+    });
+    
+    document.getElementById('bloatware-btn').addEventListener('click', () => {
+    window.electronAPI.openBloatwareWindow();
+    });
+    document.getElementById('bitlocker-btn').addEventListener('click', () => {
+    window.electronAPI.openBitLockerWindow();
+    });
+    document.getElementById('activation-btn').addEventListener('click', () => {
+    window.electronAPI.openActivationWindow();
+    });
+
+          // Helper: đảm bảo có thư mục backup hiện tại
+  function ensureBackupDir() {
+    const v = document.getElementById('backup-folder')?.value?.trim();
+    if (!v) {
+      Swal.fire('Thiếu thư mục sao lưu','Hãy chọn "Thư mục sao lưu backup" trước.','warning');
+      return null;
+    }
+    return v;
+  }
+
+  // === Sao lưu Wi-Fi ===
+document.getElementById('backup-wifi-btn').addEventListener('click', async () => {
+  try {
+    Swal.fire({ title: 'Đang đọc danh sách Wi-Fi...', allowOutsideClick:false, didOpen: () => Swal.showLoading() });
+    const res = await window.electronAPI.listWifiProfiles();
+    if (!res?.success) { Swal.fire('Lỗi', res?.message || 'Không thể lấy danh sách Wi-Fi.', 'error'); return; }
+
+    // ÉP VỀ MẢNG kể cả khi PowerShell trả 1 object
+    const raw   = JSON.parse(res.data || '[]');
+    const items = Array.isArray(raw) ? raw : (raw ? [raw] : []);
+    if (!items.length) { Swal.fire('Thông báo','Không tìm thấy profile Wi-Fi nào.','info'); return; }
+
+
+      // Render danh sách tick chọn
+      const htmlList = items.map((x, idx) => {
+        const pwd = x.Password ? `<code>${x.Password}</code>` : '<i style="color:#999">không đọc được</i>';
+        const sec = [x.Authentication, x.Cipher].filter(Boolean).join(' | ');
+        return `
+          <label style="display:flex;gap:10px;align-items:flex-start;margin:6px 0;">
+            <input type="checkbox" class="wifi-item" data-name="${x.Name.replace(/"/g,'&quot;')}" checked>
+            <div style="line-height:1.35">
+              <div><b>${x.SSID || x.Name}</b> <span style="color:#999;">(${x.Name})</span></div>
+              <div>Mật khẩu: ${pwd}</div>
+              ${sec ? `<div style="color:#555">${sec}</div>` : ''}
+            </div>
+          </label>
+        `;
+      }).join('');
+
+      const swalHtml = `
+        <div style="text-align:left;max-height:60vh;overflow:auto;">
+          <div style="margin-bottom:8px;">
+            <button id="wifi-select-all"  class="swal2-confirm swal2-styled" style="background:#6c757d;margin-right:8px;">Chọn tất cả</button>
+            <button id="wifi-unselect-all" class="swal2-deny swal2-styled"    style="background:#adb5bd;">Bỏ chọn</button>
+          </div>
+          ${htmlList}
+        </div>
+      `;
+
+      await Swal.fire({
+        title: 'Sao lưu Wi‑Fi đã lưu',
+        html: swalHtml,
+        width: '720px',
+        showCancelButton: true,
+        confirmButtonText: 'Sao lưu các mạng đã chọn',
+        cancelButtonText: 'Đóng',
+        didOpen: () => {
+          const $ = (sel) => Swal.getHtmlContainer().querySelector(sel);
+          $('#wifi-select-all').addEventListener('click', () => {
+            Swal.getHtmlContainer().querySelectorAll('.wifi-item').forEach(cb => cb.checked = true);
+          });
+          $('#wifi-unselect-all').addEventListener('click', () => {
+            Swal.getHtmlContainer().querySelectorAll('.wifi-item').forEach(cb => cb.checked = false);
+          });
+        },
+        preConfirm: () => {
+          const boxes = Swal.getHtmlContainer().querySelectorAll('.wifi-item:checked');
+          const picked = Array.from(boxes).map(cb => cb.getAttribute('data-name'));
+          if (picked.length === 0) {
+            Swal.showValidationMessage('Hãy chọn ít nhất 1 mạng Wi‑Fi để sao lưu.');
+            return false;
+          }
+          return picked;
+        }
+      }).then(async (ret) => {
+        if (!ret.isConfirmed) return;
+        const names = ret.value || [];
+        const outBase = ensureBackupDir();
+        if (!outBase) return;
+
+        Swal.fire({ title: 'Đang sao lưu...', allowOutsideClick:false, didOpen: () => Swal.showLoading() });
+        const r2 = await window.electronAPI.backupWifiProfiles({ names, outputDir: outBase });
+if (!r2?.success) { Swal.fire('Lỗi', r2?.message || 'Sao lưu thất bại.', 'error'); return; }
+
+    const html = `
+        <div style="text-align:left">
+        <div><b>Tệp ZIP:</b> <code>${r2.ZipFile}</code></div>
+        </div>
+    `;
+Swal.fire({ icon:'success', title:'Hoàn tất!', html, width:'700px' });
+      });
+
+  } catch (e) {
+    console.error(e);
+    Swal.fire('Lỗi','Đã xảy ra lỗi không xác định.','error');
+  }
+});
+
+      // === Sao lưu Driver ===
+      function ensureBackupDir(){
+    const v = document.getElementById('backup-folder')?.value?.trim();
+    if(!v){ Swal.fire('Thiếu thư mục sao lưu','Hãy chọn "Thư mục sao lưu backup" trước.','warning'); return null; }
+    return v;
+  }
+
+  document.getElementById('backup-drivers-btn').addEventListener('click', async () => {
+    try{
+      Swal.fire({ title:'Đang đọc danh sách driver...', allowOutsideClick:false, didOpen:()=>Swal.showLoading() });
+      const res = await window.electronAPI.listDrivers();
+      if(!res?.success){ Swal.fire('Lỗi', res?.message || 'Không lấy được danh sách driver.', 'error'); return; }
+      const items = JSON.parse(res.data || '[]'); // [{PublishedName,ProviderName,ClassName,Date,Version,Inbox,Recommended}]
+      if(!Array.isArray(items) || items.length===0){ Swal.fire('Thông báo','Không tìm thấy driver nào.', 'info'); return; }
+
+      // Render list: ưu tiên Recommended, có nhãn "Khuyến nghị"
+    const htmlList = items.map(x=>{
+  const canExport = !!x.PublishedName;
+  const badge = (x.Recommended && !x.ProviderIsMicrosoft && !x.Inbox)
+    ? `<span style="background:#ffe8a1;color:#7a5b00;border:1px solid #f0d58a;border-radius:6px;padding:2px 6px;margin-left:6px;font-size:12px;">Khuyến nghị</span>`
+    : '';
+  const ver = [x.Date, x.Version].filter(Boolean).join(' — ');
+  const sec = [x.ClassName, x.ProviderName].filter(Boolean).join(' • ');
+  const note = x.Inbox ? 'Inbox: Có sẵn trong Windows'
+                       : (x.ProviderIsMicrosoft ? 'Microsoft driver'
+                                                : 'Third-party (không có sẵn)');
+  const disabled = canExport ? '' : 'disabled';
+  const titleDis = canExport ? '' : 'title="Thiếu tên INF nên không thể xuất tự động"';
+
+  return `
+    <label style="display:flex;gap:10px;align-items:flex-start;margin:6px 0;${canExport?'':'opacity:.7'}">
+      <input type="checkbox" class="drv-item" data-pn="${(x.PublishedName||'').replace(/"/g,'&quot;')}" ${x.Recommended&&!x.ProviderIsMicrosoft&&!x.Inbox?'checked':''} ${disabled} ${titleDis}>
+      <div style="line-height:1.35">
+        <div><b>${x.DeviceName || x.PublishedName || '(Không rõ tên thiết bị)'}</b> ${badge}</div>
+        ${x.PublishedName ? `<div style="color:#888">INF: ${x.PublishedName}</div>` : `<div style="color:#888"><i>Không có INF</i></div>`}
+        ${ver? `<div>${ver}</div>`:''}
+        ${sec? `<div style="color:#666">${sec}</div>`:''}
+        <div style="color:#999">${note}</div>
+      </div>
+    </label>
+  `;
+}).join('');
+
+      const swalHtml = `
+        <div style="text-align:left;max-height:60vh;overflow:auto;">
+          <div style="margin-bottom:8px;display:flex;gap:8px;flex-wrap:wrap;">
+            <button id="drv-select-all" class="swal2-confirm swal2-styled" style="background:#6c757d;">Chọn tất cả</button>
+            <button id="drv-unselect-all" class="swal2-deny swal2-styled" style="background:#adb5bd;">Bỏ chọn</button>
+            <button id="drv-select-reco" class="swal2-confirm swal2-styled" style="background:#f59e0b;">Chỉ chọn Khuyến nghị</button>
+          </div>
+          ${htmlList}
+        </div>
+      `;
+
+      await Swal.fire({
+        title:'Sao lưu Driver đã cài',
+        html: swalHtml,
+        width:'820px',
+        showCancelButton:true,
+        confirmButtonText:'Sao lưu các driver đã chọn',
+        cancelButtonText:'Đóng',
+        didOpen: ()=>{
+          const $ = (s)=>Swal.getHtmlContainer().querySelector(s);
+          $('#drv-select-all').addEventListener('click', ()=>Swal.getHtmlContainer().querySelectorAll('.drv-item').forEach(cb=>cb.checked=true));
+          $('#drv-unselect-all').addEventListener('click', ()=>Swal.getHtmlContainer().querySelectorAll('.drv-item').forEach(cb=>cb.checked=false));
+          $('#drv-select-reco').addEventListener('click', ()=>{
+            Swal.getHtmlContainer().querySelectorAll('.drv-item').forEach(cb=>{
+              const label = cb.closest('label');
+              const hasReco = label?.querySelector('span')?.textContent?.includes('Khuyến nghị');
+              cb.checked = !!hasReco;
+            });
+          });
+        },
+        preConfirm: ()=>{
+          const boxes = Swal.getHtmlContainer().querySelectorAll('.drv-item:checked');
+          const picked = Array.from(boxes).map(cb=>cb.getAttribute('data-pn')).filter(Boolean);
+          if(picked.length===0){
+            Swal.showValidationMessage('Hãy chọn ít nhất 1 driver.');
+            return false;
+          }
+          return picked;
+        }
+      }).then(async (ret)=>{
+        if(!ret.isConfirmed) return;
+        const publishedNames = ret.value || [];
+        const outBase = ensureBackupDir(); if(!outBase) return;
+
+        Swal.fire({ title:'Đang sao lưu driver...', allowOutsideClick:false, didOpen:()=>Swal.showLoading() });
+        const r2 = await window.electronAPI.backupDrivers({ publishedNames, outputDir: outBase });
+        if(!r2?.success){ Swal.fire('Lỗi', r2?.message || 'Sao lưu thất bại.', 'error'); return; }
+        const html = `<div style="text-align:left"><div><b>Tệp ZIP:</b> <code>${r2.ZipFile}</code></div></div>`;
+        Swal.fire({ icon:'success', title:'Hoàn tất!', html, width:'700px' });
+      });
+
+    }catch(err){
+      console.error(err);
+      Swal.fire('Lỗi','Đã xảy ra lỗi không xác định.','error');
+    }
+  });
+
+      // === Sao lưu Dữ liệu ===
+// helper thư mục backup đang có sẵn
+function ensureBackupDir(){
+  const v = document.getElementById('backup-folder')?.value?.trim();
+  if(!v){ Swal.fire('Thiếu thư mục sao lưu','Hãy chọn "Thư mục sao lưu backup" trước.','warning'); return null; }
+  return v;
+}
+
+// Format dung lượng (tuỳ chọn)
+function fmtBytes(n){
+  if(n==null || isNaN(n)) return '';
+  const u=['B','KB','MB','GB','TB']; let i=0; let v=Number(n);
+  while(v>=1024 && i<u.length-1){ v/=1024; i++; }
+  return v.toFixed(v<10?2:0)+' '+u[i];
+}
+
+document.getElementById('backup-data-btn').addEventListener('click', async () => {
+  try {
+    Swal.fire({ title: 'Đang chuẩn bị...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+    const rootsRes = await window.electronAPI.getBackupDataRoots();
+    if (!rootsRes?.success) { Swal.fire('Lỗi', rootsRes?.message || 'Không lấy được danh sách thư mục gốc.', 'error'); return; }
+    const roots = JSON.parse(rootsRes.data || '[]');
+
+    // Xây UI 2 cột
+    const leftItems = (grp) => roots.filter(r => r.Group === grp).map(r => `
+      <div class="bd-root" data-path="${r.Path.replace(/"/g,'&quot;')}" data-key="${r.Key}">
+        <input type="radio" name="bd-root" id="bd-${r.Key}">
+        <label for="bd-${r.Key}">
+          <div class="title">${r.Label}</div>
+          ${r.Note ? `<div class="note">${r.Note}</div>` : ''}
+          <div class="path">${r.Path}</div>
+        </label>
+      </div>
+    `).join('');
+
+    const swalHtml = `
+      <style>
+        .bd-wrap{display:grid;grid-template-columns:240px 1fr;gap:12px;min-height:420px;}
+        .bd-right{width:auto;max-width:none!important;min-width:0;overflow-x:hidden!important;white-space:normal!important;box-sizing:border-box;}
+        #bd-list,#bd-list .tree,#bd-list .tree ul{width:100%;white-space:normal!important;}
+        .tree .row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+        .tree .name,.tree .meta{max-width:100%;overflow-wrap:anywhere;word-break:break-word;}
+        .bd-col{padding:10px;}
+        .bd-head{font-weight:600;margin:4px 0 8px;}
+        .bd-sec{border-top:1px dashed #e5e7eb;padding-top:8px;margin-top:8px;}
+        .bd-root{border:1px solid #eee;border-radius:8px;padding:8px;margin:6px 0;}
+        .bd-root .title{font-weight:600}
+        .bd-root .note{color:#7a5b00;background:#fff4ce;display:inline-block;padding:0 6px;border-radius:6px;border:1px solid #f0d58a;margin:4px 0;}
+        .bd-root .path{color:#888;font-size:12px}
+        .bd-right .tools{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;flex-wrap:wrap}
+        .bd-item{display:flex;gap:10px;align-items:flex-start;margin:6px 0}
+        .bd-item .meta{color:#666;font-size:12px}
+        .muted{color:#999}
+        .bd-right .tools .counter{color:#444;font-size:13px;white-space:nowrap;}
+      </style>
+      <div class="bd-wrap">
+        <div class="bd-col bd-left">
+          <div class="bd-head">Cơ bản</div>
+          ${leftItems('basic')}
+          <div class="bd-sec"></div>
+          <div class="bd-head">Nâng cao</div>
+          ${leftItems('advanced')}
+        </div>
+        <div class="bd-col bd-right">
+          <div class="tools">
+            <div class="btns">
+              <button id="bd-select-all"  class="swal2-confirm swal2-styled" style="background:#6c757d">Chọn tất cả</button>
+              <button id="bd-unselect-all" class="swal2-deny swal2-styled"    style="background:#adb5bd">Bỏ chọn</button>
+            </div>
+            <div id="bd-counter" class="counter">Chưa chọn mục nào</div>
+          </div>
+          <div id="bd-list" class="muted">Hãy chọn 1 mục ở cột bên trái để liệt kê thư mục/file con…</div>
+        </div>
+      </div>
+    `;
+
+    // === MỞ POPUP & THIẾT LẬP CÂY ===
+    const ret = await Swal.fire({
+      title: 'Sao lưu dữ liệu',
+      html: swalHtml,
+      width: '960px',
+      showCancelButton: true,
+      confirmButtonText: 'Bắt đầu sao lưu',
+      cancelButtonText: 'Đóng',
+
+      didOpen: () => {
+        const $  = (s) => Swal.getHtmlContainer().querySelector(s);
+        const $$ = (s) => Swal.getHtmlContainer().querySelectorAll(s);
+
+        function updateCounter(){
+          const boxes = Swal.getHtmlContainer().querySelectorAll('#bd-list input.pick:checked');
+          let files = 0, dirs = 0;
+          boxes.forEach(cb => {
+            const li = cb.closest('li');
+            (li?.getAttribute('data-type') === 'dir') ? dirs++ : files++;
+          });
+          const total = files + dirs;
+          $('#bd-counter').textContent = total ? `Đã chọn: ${total} (thư mục: ${dirs}, file: ${files})` : 'Chưa chọn mục nào';
+        }
+
+        function nodeHTML(item){
+          const isDir = item.Type === 'dir';
+          const sizeMeta = isDir ? '(thư mục)' : `(file${item.Size ? ', ' + fmtBytes(item.Size) : ''})`;
+          return `
+            <li class="${isDir ? 'branch' : 'leaf'}" data-path="${item.FullPath.replace(/"/g,'&quot;')}" data-type="${item.Type}">
+              <div class="row">
+                <div class="toggle" aria-expanded="false">${isDir ? '▶' : ''}</div>
+                <input type="checkbox" class="pick">
+                <span class="name">${item.Name}</span>
+                <span class="meta"> ${sizeMeta}</span>
+              </div>
+              <ul class="children" style="display:none;"></ul>
+            </li>
+          `;
+        }
+
+        async function loadChildrenInto(ulElem, fullPath){
+          ulElem.innerHTML = `<li class="muted" style="padding-left:0">Đang tải...</li>`;
+          const r = await window.electronAPI.listBackupChildren({ path: fullPath });
+          if (!r || !r.success) { ulElem.innerHTML = `<li class="muted" style="padding-left:0">Không thể liệt kê nội dung.</li>`; return; }
+          const items = JSON.parse(r.data || '[]');
+          ulElem.innerHTML = (Array.isArray(items) && items.length)
+            ? items.map(nodeHTML).join('')
+            : `<li class="muted" style="padding-left:0">Trống.</li>`;
+          updateCounter();
+        }
+
+        function cascadeDown(li, checked){
+          li.querySelectorAll(':scope > ul.children input.pick').forEach(cb => cb.checked = checked);
+          li.querySelectorAll(':scope > ul.children > li').forEach(child => cascadeDown(child, checked));
+        }
+        function cascadeUp(li){
+          const parent = li.parentElement?.closest('li'); if (!parent) return;
+          const cbs = parent.querySelectorAll(':scope > ul.children input.pick');
+          if (cbs.length){
+            const checked = Array.from(cbs).filter(x => x.checked).length;
+            const pcb = parent.querySelector(':scope > .row > input.pick');
+            if (pcb){
+              pcb.indeterminate = checked > 0 && checked < cbs.length;
+              pcb.checked = checked === cbs.length;
+            }
+          }
+          cascadeUp(parent);
+        }
+
+        async function renderRoot(rootPath){
+          const list = $('#bd-list');
+          list.classList.remove('muted');
+          list.innerHTML = `<div class="tree"><ul class="root"></ul></div>`;
+          const rootUL = list.querySelector('.root');
+          await loadChildrenInto(rootUL, rootPath);
+
+          list.addEventListener('click', async (e) => {
+            const btn = e.target.closest('.toggle'); if (!btn) return;
+            const li = btn.closest('li'); if (li.classList.contains('leaf')) return;
+            const children = li.querySelector(':scope > ul.children');
+            const expanded = btn.getAttribute('aria-expanded') === 'true';
+            if (expanded){
+              children.style.display = 'none';
+              btn.setAttribute('aria-expanded','false'); btn.textContent = '▶';
+            } else {
+              if (!children.dataset.loaded){
+                await loadChildrenInto(children, li.getAttribute('data-path'));
+                children.dataset.loaded = '1';
+              }
+              children.style.display = 'block';
+              btn.setAttribute('aria-expanded','true'); btn.textContent = '▼';
+            }
+          });
+
+          list.addEventListener('change', (e) => {
+            const cb = e.target.closest('input.pick'); if (!cb) return;
+            const li = cb.closest('li');
+            cascadeDown(li, cb.checked); cascadeUp(li); updateCounter();
+          });
+        }
+
+        // Tools
+        $('#bd-select-all').addEventListener('click', () => { $$('#bd-list input.pick').forEach(cb => cb.checked = true); updateCounter(); });
+        $('#bd-unselect-all').addEventListener('click', () => { $$('#bd-list input.pick').forEach(cb => cb.checked = false); updateCounter(); });
+
+        // Chọn root ở cột trái
+        $$('.bd-root input[type="radio"]').forEach(radio => {
+          radio.addEventListener('change', e => {
+            const root = e.target.closest('.bd-root').getAttribute('data-path');
+            renderRoot(root);
+          });
+        });
+
+        // Auto chọn mục đầu tiên
+        const first = $$('.bd-root input[type="radio"]')[0];
+        if (first){ first.checked = true; first.dispatchEvent(new Event('change')); }
+      },
+
+      // >>> Trả cả picked + rootName để main dùng đặt tên ZIP
+      preConfirm: () => {
+        const container = Swal.getHtmlContainer();
+        const boxes = container.querySelectorAll('#bd-list input.pick:checked');
+        const picked = Array.from(boxes).map(cb => cb.closest('li').getAttribute('data-path'));
+        if (picked.length === 0) {
+          Swal.showValidationMessage('Hãy chọn ít nhất 1 thư mục hoặc file.');
+          return false;
+        }
+
+        // lấy tên mục gốc đang chọn ở cột trái
+        const rootEl = container.querySelector('.bd-root input[type="radio"]:checked')?.closest('.bd-root');
+        const rootName = (
+          rootEl?.querySelector('.title')?.textContent ||
+          rootEl?.getAttribute('data-key') ||
+          'Data'
+        ).trim();
+
+        console.log('[backup-data] picked count =', picked.length, picked, 'rootName =', rootName);
+        return { picked, rootName };
+      }
+    });
+
+    if (!ret.isConfirmed) return;
+
+    const outBase  = ensureBackupDir();
+    if (!outBase) return;
+
+    const toBackup = (ret.value?.picked) || [];
+    const rootName = (ret.value?.rootName) || 'Data';
+
+    Swal.fire({ title: 'Đang sao lưu...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+// GỌI IPC – gửi kèm rootName để main đặt tên ZIP: <rootName>-yyyyMMdd-HHmmss.zip
+const r2 = await window.electronAPI.backupData({ paths: toBackup, outputDir: outBase, rootName });
+
+// log để bạn xem “shape” thực sự
+console.log('[backup-data] IPC RAW =', r2);
+
+// Nếu fail rõ ràng thì báo lỗi
+if (!r2 || !r2.success) {
+  Swal.fire('Lỗi', (r2 && r2.message) ? r2.message : 'Sao lưu thất bại.', 'error');
+  return;
+}
+
+// ---- helpers hiển thị ----
+const escapeHtml = (s) => String(s)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+  .replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+  .replace(/'/g,'&#39;');
+
+function normalizeResults(r, fallbackName) {
+  // 1) Chuẩn: results là array object
+  if (Array.isArray(r?.results)) return r.results;
+
+  // 2) data là array
+  if (Array.isArray(r?.data)) return r.data;
+
+  // 3) Có ZipFile / zipFile ở cấp 1
+  if (r?.ZipFile || r?.zipFile) {
+    return [{ Name: fallbackName, ZipFile: r.ZipFile || r.zipFile }];
+  }
+
+  // 4) data là string path
+  if (typeof r?.data === 'string' && r.data.trim()) {
+    return [{ Name: fallbackName, ZipFile: r.data.trim() }];
+  }
+
+  // 5) r là string path
+  if (typeof r === 'string' && r.trim()) {
+    return [{ Name: fallbackName, ZipFile: r.trim() }];
+  }
+
+  // 6) r là array string
+  if (Array.isArray(r) && r.every(x => typeof x === 'string')) {
+    return r.map(p => ({ Name: fallbackName, ZipFile: p }));
+  }
+
+  // 7) object đơn có Name/ZipFile
+  if (r && typeof r === 'object' && (r.Name || r.ZipFile || r.zipFile)) {
+    return [{ Name: r.Name || fallbackName, ZipFile: r.ZipFile || r.zipFile || null }];
+  }
+
+  return [];
+}
+
+// Chuẩn hoá kết quả
+const results = normalizeResults(r2, rootName || 'Data');
+const ok   = results.filter(x => x && x.ZipFile);
+const fail = results.filter(x => !x || !x.ZipFile);
+
+let html = '';
+if (ok.length) {
+  html += `<div style="text-align:left;margin-bottom:8px">
+             <b>Đã tạo:</b> <code style="font-size:16px">${ok[0].ZipFile}</code>
+           </div>`;
+}
+if (fail.length) {
+  html += `<div style="text-align:left;margin-top:12px;color:#b91c1c">
+             <b>Lỗi:</b> ${fail.map(x => x.Error || 'Không rõ').join(', ')}
+           </div>`;
+}
+if (!html) html = `<div style="text-align:left"><i>Không có tệp nào được tạo.</i></div>`;
+Swal.fire({ icon:'success', title:'Hoàn tất!', html, width:'720px' });
+
+  } catch (err) {
+    console.error(err);
+    Swal.fire('Lỗi', 'Đã xảy ra lỗi không xác định.', 'error');
+  }
+});
+
+
+// === Sao lưu Zalo ===
+  document.getElementById('backup-zalo-btn').addEventListener('click', async () => {
+  const outBase = ensureBackupDir();
+  if (!outBase) return;
+
+  const conf = await Swal.fire({
+    title: 'Sao lưu Zalo?',
+    text: 'Sao lưu toàn bộ thư mục "Zalo Received Files" trong Documents và nén thành một tệp.',
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonText: 'Có',
+    cancelButtonText: 'Không'
+  });
+  if (!conf.isConfirmed) return;
+
+  try {
+    Swal.fire({ title:'Đang sao lưu...', allowOutsideClick:false, didOpen:()=>Swal.showLoading() });
+
+    const r2 = await window.electronAPI.backupZalo({ outputDir: outBase });
+
+    if (!r2 || !r2.success) {
+      Swal.fire('Lỗi', (r2 && r2.message) ? r2.message : 'Sao lưu thất bại.', 'error');
+      return;
+    }
+
+    // chuẩn hoá (phòng khi handler trả kiểu khác)
+    let results = Array.isArray(r2.results) ? r2.results : [];
+    if (!results.length && r2.ZipFile) results = [{ ZipFile: r2.ZipFile }];
+
+    const ok   = results.filter(x => x && x.ZipFile);
+    const fail = results.filter(x => !x || !x.ZipFile);
+
+    let html = '';
+    if (ok.length) {
+      // một dòng, cùng kích cỡ chữ
+      html += `<div style="text-align:left;margin-bottom:8px"><b>Đã tạo:</b> <code style="font-size:14px">${ok[0].ZipFile}</code></div>`;
+    }
+    if (fail.length) {
+      html += `<div style="text-align:left;color:#b91c1c"><b>Lỗi:</b> ${fail.map(x => x.Error || 'Không rõ').join(', ')}</div>`;
+    }
+    if (!html) {
+      html = `<div style="text-align:left"><i>Không có tệp nào được tạo.</i></div>`;
+    }
+
+    Swal.fire({ icon:'success', title:'Hoàn tất!', html, width:'720px' });
+  } catch (err) {
+    console.error(err);
+    Swal.fire('Lỗi', 'Đã xảy ra lỗi không xác định.', 'error');
+  }
+});
+
+// === Sao lưu Registry ===
+document.getElementById('backup-registry-btn').addEventListener('click', async () => {
+  const outBase = ensureBackupDir();
+  if (!outBase) return;
+
+  try {
+    const list = await window.electronAPI.registryList();
+    const soft = (list?.data?.Software || []).slice(0, 500);
+    const cps  = (list?.data?.ControlPanel || []);
+
+    const basic = [
+      { key:'hkcu_software',      label:'Cài đặt Phần mềm (HKCU\\Software)', desc:'Lưu cấu hình người dùng cho phần mềm.' },
+      { key:'hkcu_control_panel', label:'Tùy chỉnh cá nhân (HKCU\\Control Panel)', desc:'Chuột, bàn phím, màn hình, giao diện…' },
+    ];
+
+    const renderList = () => `
+      <style>
+        .grp{border:1px solid #eee;border-radius:8px;padding:8px;margin:10px 0}
+        .title{font-weight:700;margin-bottom:6px}
+        .cols{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.25rem}
+        .item{display:flex;align-items:center;gap:.5rem;padding:4px 6px}
+        .item input{margin:0}
+        @media (max-width:720px){ .cols{grid-template-columns:1fr} }
+      </style>
+      <div class="grp">
+        <div class="title">Chọn nhanh (nguyên nhánh)</div>
+        ${basic.map(b => `
+          <label class="item"><input type="checkbox" class="pick" value="${b.key}" checked>
+          <div><b>${b.label}</b><div style="font-size:12px;color:#666">${b.desc}</div></div></label>
+        `).join('')}
+      </div>
+
+      <div class="grp">
+        <div class="title">Phần mềm (HKCU\\Software)</div>
+        <input id="srch1" placeholder="Tìm theo tên..." style="width:100%;margin:4px 0 8px 0;padding:6px 8px">
+        <div id="softList" class="cols">
+          ${soft.map(s => `
+            <label class="item"><input type="checkbox" class="pick" value="reg:${s.Path}">
+            <div>${s.Name}</div></label>`).join('')}
+        </div>
+      </div>
+
+      <div class="grp">
+        <div class="title">Tùy chỉnh cá nhân (Control Panel — có nâng cao)</div>
+        <div class="cols">
+          ${cps.map(s => `
+            <label class="item"><input type="checkbox" class="pick" value="reg:${s.Path}">
+            <div>${s.Name}</div></label>`).join('')}
+        </div>
+      </div>
+
+      <p style="color:#d9534f;font-size:13px">
+        <b>Cảnh báo:</b> Khôi phục nên thực hiện trên cùng máy & phiên bản Windows để tránh lỗi hệ thống.
+      </p>
+      <script>
+        const inp = document.getElementById('srch1');
+        const list = document.getElementById('softList');
+        inp?.addEventListener('input', () => {
+          const q = (inp.value || '').toLowerCase().trim();
+          Array.from(list.querySelectorAll('.item')).forEach(li=>{
+            const t = li.textContent.toLowerCase();
+            li.style.display = (!q || t.includes(q)) ? '' : 'none';
+          });
+        });
+      <\/script>
+    `;
+
+    const pick = await Swal.fire({
+      title:'Chọn các phần Registry cần sao lưu',
+      html: renderList(),
+      width: 780,
+      focusConfirm: false,
+      showCancelButton: true,
+      confirmButtonText: 'Bắt đầu sao lưu',
+      cancelButtonText: 'Hủy',
+      preConfirm: () => {
+        const chosen = Array.from(Swal.getPopup().querySelectorAll('.pick'))
+          .filter(c => c.checked)
+          .map(c => c.value);
+        if (!chosen.length) { Swal.showValidationMessage('Hãy chọn ít nhất 1 mục.'); }
+        return chosen;
+      }
+    });
+    if (!pick.isConfirmed) return;
+
+    Swal.fire({ title:'Đang sao lưu Registry…', allowOutsideClick:false, didOpen:()=>Swal.showLoading() });
+const r = await window.electronAPI.backupRegistry({ keys: pick.value, outputDir: outBase });
+if (!r || !r.success) { Swal.fire('Lỗi', r?.message || 'Sao lưu thất bại.', 'error'); return; }
+
+const zipPath = r.ZipFile || r.zip;   // <— dòng quan trọng
+let html = `<div style="text-align:left;margin-bottom:8px">
+  <b>Đã tạo 1 gói ZIP:</b><br><code style="font-size:13px">${zipPath || '(không xác định)'}</code>
+</div>`;
+
+
+    Swal.fire({ icon:'success', title:'Hoàn tất!', html, width:'820px' });
+  } catch (e) {
+    console.error(e);
+    Swal.fire('Lỗi', 'Đã xảy ra lỗi không xác định.', 'error');
+  }
+});
+
+  // === Khôi phục Dữ liệu ===
+
+// === Khôi phục Dữ liệu ===
+(function () {
+  const btn = document.getElementById('restore-data-btn');
+  if (!btn) return;
+
+  function ensureBackupDir() {
+    const v = document.getElementById('backup-folder')?.value?.trim();
+    if (!v) {
+      Swal.fire('Thiếu thư mục sao lưu','Hãy chọn "Thư mục sao lưu backup" trước.','warning');
+      return null;
+    }
+    return v;
+  }
+
+  btn.addEventListener('click', async () => {
+    try {
+      const baseDir = ensureBackupDir(); if (!baseDir) return;
+
+      Swal.fire({ title:'Đang quét gói sao lưu…', allowOutsideClick:false, didOpen:()=>Swal.showLoading() });
+
+      const catalog = await window.electronAPI.restoreList({ baseDir });
+      if (!catalog?.success) {
+        Swal.fire('Lỗi', catalog?.message || 'Không thể quét thư mục backup.', 'error');
+        return;
+      }
+
+      const items = catalog.items || [];
+      if (!items.length) {
+        Swal.fire('Không tìm thấy gói', 'Thư mục backup không có tệp nào có thể khôi phục.', 'info');
+        return;
+      }
+
+      // Render danh sách gói để chọn
+      const html = `
+        <div style="text-align:left;max-height:48vh;overflow:auto">
+          ${items.map((it) => {
+            const dis = it.restorable ? '' : 'disabled';
+            const note = it.restorable ? '' : ' <em style="color:#666">(không thể khôi phục)</em>';
+            return `
+              <div style="margin:.35rem 0">
+                <label style="display:flex;gap:.5rem;align-items:center">
+                  <input type="checkbox" value="${it.id}" ${dis}/>
+                  <div>
+                    <div><b>${it.label}</b>${note}</div>
+                    <div style="font-size:12px;color:#555">${it.sourceName}</div>
+                    ${it.targetHint ? `<div style="font-size:12px;color:#777">→ ${it.targetHint}</div>` : ''}
+                  </div>
+                </label>
+              </div>`;
+          }).join('')}
+        </div>`;
+
+      const pick = await Swal.fire({
+        title: 'Chọn gói cần khôi phục',
+        html, width: '800px', focusConfirm: false,
+        showCancelButton: true, confirmButtonText: 'Bắt đầu', cancelButtonText: 'Hủy',
+        preConfirm: () => {
+          const chosen = Array.from(Swal.getPopup().querySelectorAll('input[type=checkbox]'))
+            .filter(c => c.checked).map(c => c.value);
+          if (!chosen.length) { Swal.showValidationMessage('Hãy chọn ít nhất 1 gói.'); }
+          return chosen;
+        }
+      });
+      if (!pick.isConfirmed) return;
+
+      // === Nếu có gói Registry, hỏi chi tiết các file .REG cần khôi phục ===
+      const chosenIds = pick.value;
+      const regSelections = {}; // { [id]: ['Mouse.reg','7-Zip.reg', ...] }
+
+      for (const id of chosenIds) {
+        const it = items.find(x => x.id === id);
+        if (!it || it.kind !== 'registry') continue;
+
+        const resp = await window.electronAPI.registryZipEntries({ zipPath: it.source });
+        const entries = (resp?.entries || []).map(e => e.Name);
+        if (!entries.length) continue;
+
+        if (entries.length > 1) {
+          const htmlPickRegs = `
+            <div style="text-align:left;max-height:45vh;overflow:auto">
+              ${entries.map(n => `
+                <label style="display:block;margin:.25rem 0">
+                  <input type="checkbox" class="pick-reg" value="${n}" checked> <code>${n}</code>
+                </label>`).join('')}
+            </div>`;
+          const sel = await Swal.fire({
+            title: `Chọn file .REG trong "${it.sourceName}"`,
+            html: htmlPickRegs, width: 720, focusConfirm: false,
+            showCancelButton: true, confirmButtonText: 'Tiếp tục', cancelButtonText: 'Hủy',
+            preConfirm: () => {
+              const picked = Array.from(Swal.getHtmlContainer().querySelectorAll('.pick-reg:checked'))
+                .map(x => x.value);
+              if (!picked.length) { Swal.showValidationMessage('Hãy chọn ít nhất 1 file .reg.'); return false; }
+              return picked;
+            }
+          });
+          if (!sel.isConfirmed) return; // người dùng hủy
+          regSelections[id] = sel.value;
+        } else {
+          // Chỉ có 1 file thì tự động chọn
+          regSelections[id] = entries;
+        }
+      }
+
+      // Gọi khôi phục, gửi kèm regSelections
+      Swal.fire({ title:'Đang khôi phục…', allowOutsideClick:false, didOpen:()=>Swal.showLoading() });
+      const r = await window.electronAPI.restoreRun({ baseDir, ids: chosenIds, regSelections });
+
+      if (!r?.success) {
+        Swal.fire('Lỗi', r?.message || 'Khôi phục thất bại.', 'error');
+        return;
+      }
+
+      // Kết quả trả về là mảng các item
+      const resItems = Array.isArray(r.results) ? r.results : [];
+
+      // Tiện ích render chi tiết cho mục Registry
+      const renderRegistryDetail = (it) => {
+        if (it?.kind !== 'registry') return '';
+        const ok   = Array.isArray(it.regOk)   ? it.regOk   : [];
+        const fail = Array.isArray(it.regFail) ? it.regFail : [];
+        let html = '';
+        if (ok.length) {
+          html += `<div style="margin:6px 0 0 18px">
+            <b>Đã import:</b><br>${ok.map(n => `<code style="font-size:12px">${n}</code>`).join('<br>')}
+          </div>`;
+        }
+        if (fail.length) {
+          html += `<div style="margin:6px 0 0 18px;color:#b91c1c">
+            <b>Lỗi:</b><br>${
+              fail.map(e => `<code style="font-size:12px">${e.Name || ''}</code>${e.Message ? (' — ' + e.Message) : ''}`).join('<br>')
+            }
+          </div>`;
+        }
+        return html;
+        };
+
+      const ok = resItems.filter(x => x?.success);
+      const fail = resItems.filter(x => !x?.success);
+
+      let htmlDone = '';
+      if (ok.length) {
+        htmlDone += `<div style="text-align:left"><b>Thành công:</b><ul>${
+          ok.map(x => `
+            <li>
+              ${x.label}
+              ${x.kind === 'registry'
+                ? renderRegistryDetail(x)
+                : (x.target ? ` → <code>${x.target}</code>` : '')}
+            </li>`
+          ).join('')}
+        </ul></div>`;
+      }
+      if (fail.length) {
+        htmlDone += `<div style="text-align:left;color:#b91c1c"><b>Thất bại:</b><ul>${
+          fail.map(x => `
+            <li>
+              ${x.label}
+              ${x.kind === 'registry' ? renderRegistryDetail(x) : ''}
+              ${x.message ? ` — ${x.message}` : ''}
+            </li>`
+          ).join('')}
+        </ul></div>`;
+      }
+
+      Swal.fire({
+        icon: fail.length ? 'warning' : 'success',
+        title: 'Hoàn tất!',
+        html: htmlDone || 'Đã khôi phục.',
+        width: '820px'
+      });
+
+    } catch (err) {
+      console.error(err);
+      Swal.fire('Lỗi', String(err?.message || err), 'error');
+    }
+  });
+})();
+</script>
+</body>
+</html>

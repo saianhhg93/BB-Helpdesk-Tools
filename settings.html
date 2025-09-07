@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Thiết lập Windows</title>
+    <style>
+        body { font-family: "Segoe UI",-apple-system,BlinkMacSystemFont,Roboto,"Helvetica Neue",sans-serif; padding: 10px 25px; font-size: 14px; background-color: #f0f0f0; }
+        h1, h3, h4, h5 { color: #333; margin-top: 0; }
+        h3 { padding-bottom: 10px; border-bottom: 1px solid #eee; }
+        h4 { margin-top: 20px; margin-bottom: 15px; }
+        h5 { margin-bottom: 10px; font-weight: 600;}
+        .setting-group { margin-bottom: 20px; background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .input-group { display: flex; align-items: center; gap: 10px; margin-bottom: 15px; }
+        input[type="text"], select { padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; background-color: #fff; min-width: 200px; }
+        button { padding: 8px 15px; border: none; background-color: #0078d4; color: white; border-radius: 4px; cursor: pointer; font-weight: 600; }
+        button:hover { background-color: #005a9e; }
+        .toggle-group { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; }
+        .switch { position: relative; display: inline-block; width: 40px; height: 20px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .2s; border-radius: 20px;}
+        .slider:before { position: absolute; content: ""; height: 12px; width: 12px; left: 4px; bottom: 4px; background-color: white; transition: .2s; border-radius: 50%;}
+        input:checked + .slider { background-color: #0078d4; }
+        input:checked + .slider:before { transform: translateX(20px); }
+        .grid-container { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
+        .power-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .timeout-item { display: flex; align-items: center; gap: 10px; margin-bottom: 15px; }
+        .timeout-item label { width: 110px; flex-shrink: 0; }
+        .timeout-item select { min-width: 120px; width: 120px; }
+        small { color: #666; }
+    </style>
+</head>
+<body>
+    <h1 style="text-align: center;">Thiết lập Windows</h1>
+    
+    <div class="setting-group">
+        <h3>Định danh hệ thống</h3>
+        <div class="input-group">
+            <input type="text" id="computer-name-input" placeholder="Tên máy tính mới">
+            <button id="rename-btn">Đổi tên</button>
+        </div>
+        <div class="input-group">
+            <input type="text" id="workgroup-input" placeholder="Tên Workgroup mới">
+            <button id="workgroup-btn">Đổi Workgroup</button>
+        </div>
+        <p><small>Lưu ý: Cần khởi động lại máy để áp dụng thay đổi.</small></p>
+    </div>
+
+    <div class="setting-group">
+        <h3>Thời gian</h3>
+        <div class="input-group">
+            <label for="timezone-select">Múi giờ:</label>
+            <select id="timezone-select" style="max-width: 350px;"></select>
+            <button id="timezone-btn">Áp dụng</button>
+        </div>
+    </div>
+
+    <div class="setting-group">
+        <h3>Nguồn & Pin</h3>
+        <div class="power-item">
+            <label>Chế độ nguồn:</label>
+            <select id="power-mode">
+                <option value="powerSaver">Tiết kiệm điện</option>
+                <option value="balanced">Cân bằng</option>
+                <option value="highPerformance">Hiệu năng cao</option>
+            </select>
+        </div>
+        <hr style="border: 1px solid #eee; margin: 20px 0;">
+        <h4>Màn hình và ngủ đông</h4>
+        <div class="grid-container">
+            <div>
+                <h5>Khi cắm sạc</h5>
+                <div class="timeout-item">
+                    <label>Tắt màn sau</label>
+                    <select id="screen-off-ac" class="timeout-select" data-type="monitor" data-mode="ac"></select>
+                </div>
+                <div class="timeout-item">
+                    <label>Sleep sau</label>
+                    <select id="sleep-ac" class="timeout-select" data-type="standby" data-mode="ac"></select>
+                </div>
+            </div>
+            <div>
+                <h5>Khi dùng pin</h5>
+                <div class="timeout-item">
+                    <label>Tắt màn sau</label>
+                    <select id="screen-off-dc" class="timeout-select" data-type="monitor" data-mode="dc"></select>
+                </div>
+                <div class="timeout-item">
+                    <label>Sleep sau</label>
+                    <select id="sleep-dc" class="timeout-select" data-type="standby" data-mode="dc"></select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="setting-group">
+        <h3>Bảo mật & Tùy chọn</h3>
+        <div class="toggle-group">
+            <label>User Account Control (UAC)</label>
+            <label class="switch"><input type="checkbox" id="uac-toggle" data-feature="uac"><span class="slider"></span></label>
+        </div>
+        <div class="toggle-group">
+            <label>Windows Firewall</label>
+            <label class="switch"><input type="checkbox" id="firewall-toggle" data-feature="firewall"><span class="slider"></span></label>
+        </div>
+        <div class="toggle-group">
+            <label>Windows Update</label>
+            <label class="switch"><input type="checkbox" id="update-toggle" data-feature="windows-update"><span class="slider"></span></label>
+        </div>
+        <hr style="border: 1px solid #eee; margin: 15px 0;">
+        <div class="toggle-group">
+            <label>Mở "This PC" thay vì "Quick access"</label>
+            <label class="switch"><input type="checkbox" id="explorer-toggle" data-feature="explorer"><span class="slider"></span></label>
+        </div>
+        <div class="toggle-group">
+            <label>Hiển thị ô tìm kiếm dưới dạng Icon</label>
+            <label class="switch"><input type="checkbox" id="search-toggle" data-feature="search"><span class="slider"></span></label>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            populateTimezoneSelect();
+            populateTimeoutSelects();
+            loadInitialState();
+            addEventListeners();
+        });
+
+        async function loadInitialState() {
+            const settings = await window.electronAPI.getAllSettings();
+            if (!settings) return;
+
+            document.getElementById('uac-toggle').checked = settings.uac === '1';
+            document.getElementById('firewall-toggle').checked = settings.firewall === 'True';
+            document.getElementById('update-toggle').checked = settings.windowsUpdate !== 'Disabled';
+            document.getElementById('explorer-toggle').checked = settings.explorer === '1';
+            document.getElementById('search-toggle').checked = settings.search === '1';
+
+            const powerPlanGuids = {
+                'a1841308-3541-4fab-bc81-f71556f20b4a': 'powerSaver',
+                '381b4222-f694-41f0-9685-ff5bb260df2e': 'balanced',
+                '8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c': 'highPerformance'
+            };
+            document.getElementById('power-mode').value = powerPlanGuids[settings.powerMode] || 'balanced';
+        }
+
+        function addEventListeners() {
+            document.querySelectorAll('input[type="checkbox"][data-feature]').forEach(toggle => {
+                toggle.addEventListener('change', () => {
+                    window.electronAPI.setToggleStatus({ 
+                        feature: toggle.dataset.feature, 
+                        isEnabled: toggle.checked 
+                    });
+                });
+            });
+
+            document.getElementById('power-mode').addEventListener('change', (event) => {
+                window.electronAPI.setPowerMode({ mode: event.target.value });
+            });
+
+            document.querySelectorAll('.timeout-select').forEach(select => {
+                select.addEventListener('change', (event) => {
+                    window.electronAPI.setTimeouts({
+                        type: select.dataset.type,
+                        mode: select.dataset.mode,
+                        minutes: event.target.value
+                    });
+                });
+            });
+
+            document.getElementById('rename-btn').addEventListener('click', () => {
+                const name = document.getElementById('computer-name-input').value;
+                if(name) window.electronAPI.setComputerName(name);
+            });
+            document.getElementById('workgroup-btn').addEventListener('click', () => {
+                const name = document.getElementById('workgroup-input').value;
+                if(name) window.electronAPI.setWorkgroup(name);
+            });
+
+            document.getElementById('timezone-btn').addEventListener('click', () => {
+                const tz = document.getElementById('timezone-select').value;
+                window.electronAPI.setTimezone(tz);
+            });
+        }
+
+        function populateTimeoutSelects() {
+            const options = [
+                { value: 1, text: '1 phút' }, { value: 5, text: '5 phút' },
+                { value: 10, text: '10 phút' }, { value: 15, text: '15 phút' },
+                { value: 30, text: '30 phút' }, { value: 60, text: '1 giờ' },
+                { value: 120, text: '2 giờ' }, { value: 0, text: 'Không' }
+            ];
+            document.querySelectorAll('.timeout-select').forEach(select => {
+                options.forEach(opt => select.add(new Option(opt.text, opt.value)));
+                select.value = 0;
+            });
+        }
+
+        function populateTimezoneSelect() {
+            const timezones = { "Dateline Standard Time": "(UTC-12:00) International Date Line West", "UTC-11": "(UTC-11:00) Coordinated Universal Time-11", "Hawaiian Standard Time": "(UTC-10:00) Hawaii", "Alaskan Standard Time": "(UTC-09:00) Alaska", "Pacific Standard Time": "(UTC-08:00) Pacific Time (US & Canada)", "Mountain Standard Time": "(UTC-07:00) Mountain Time (US & Canada)", "Central Standard Time": "(UTC-06:00) Central Time (US & Canada)", "Eastern Standard Time": "(UTC-05:00) Eastern Time (US & Canada)", "Atlantic Standard Time": "(UTC-04:00) Atlantic Time (Canada)", "E. South America Standard Time": "(UTC-03:00) Brasilia", "Greenwich Standard Time": "(UTC+00:00) Monrovia, Reykjavik", "W. Europe Standard Time": "(UTC+01:00) Amsterdam, Berlin, Rome", "E. Europe Standard Time": "(UTC+02:00) Chisinau", "Russian Standard Time": "(UTC+03:00) Moscow, St. Petersburg", "Arabian Standard Time": "(UTC+04:00) Abu Dhabi, Muscat", "West Asia Standard Time": "(UTC+05:00) Ashgabat, Tashkent", "India Standard Time": "(UTC+05:30) Chennai, Kolkata, New Delhi", "Central Asia Standard Time": "(UTC+06:00) Astana", "SE Asia Standard Time": "(UTC+07:00) Bangkok, Hanoi, Jakarta", "China Standard Time": "(UTC+08:00) Beijing, Hong Kong", "Tokyo Standard Time": "(UTC+09:00) Osaka, Sapporo, Tokyo", "AUS Eastern Standard Time": "(UTC+10:00) Canberra, Melbourne, Sydney", "New Zealand Standard Time": "(UTC+12:00) Auckland, Wellington" };
+            const select = document.getElementById('timezone-select');
+            for (const id in timezones) {
+                select.add(new Option(timezones[id], id));
+            }
+            select.value = "SE Asia Standard Time";
+        }
+    </script>
+</body>
+</html>

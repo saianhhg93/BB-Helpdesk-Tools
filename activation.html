@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<title>Kích hoạt Windows & Office</title>
+<style>
+  body{font-family:"Segoe UI",Arial,sans-serif;margin:0;background:#f5f5f5}
+  .wrap{max-width:1000px;margin:20px auto;background:#fff;border-radius:8px;box-shadow:0 4px 10px rgba(0,0,0,.08);padding:20px}
+  h2{margin:0 0 12px}
+  .status{border:1px solid #eee;border-radius:8px;padding:12px;margin-bottom:16px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .card{border:1px solid #eee;border-radius:8px}
+  .card h3{margin:0;padding:12px;border-bottom:1px solid #eee;background:#fafafa}
+  .card .body{padding:12px}
+  .row{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+  .row label{min-width:160px;font-weight:600}
+  .methods{display:grid;grid-template-columns:repeat(2, minmax(160px,1fr));gap:8px;margin:8px 0 12px}
+  .method{border:1px solid #ddd;border-radius:6px;padding:8px;cursor:pointer}
+  .method input{margin-right:6px}
+  .btn{padding:10px 16px;border:1px solid #ccc;background:#f0f0f0;border-radius:6px;font-weight:600;cursor:pointer}
+  .btn:hover{background:#e7e7e7}
+  .mono{font-family:Consolas,monospace;white-space:pre-wrap;background:#fcfcfc;border:1px dashed #eee;border-radius:6px;padding:8px}
+  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .kv{display:grid;grid-template-columns:220px 1fr;gap:8px;margin:6px 0}
+  .kv b{color:#444}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body>
+  <div class="wrap">
+    <h2>Trạng thái bản quyền</h2>
+    <div class="status" id="statusBox">
+      <div class="two-col">
+        <div>
+          <h3>Windows</h3>
+          <div id="winStatus"></div>
+        </div>
+        <div>
+          <h3>Office</h3>
+          <div id="offStatus"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h3>Kích hoạt Windows</h3>
+        <div class="body">
+          <div class="methods" id="winMethods">
+            <label class="method"><input type="radio" name="winMethod" value="HWID" checked> HWID</label>
+            <label class="method"><input type="radio" name="winMethod" value="TSforge"> TSforge</label>
+            <label class="method"><input type="radio" name="winMethod" value="KMS38"> KMS38</label>
+            <label class="method"><input type="radio" name="winMethod" value="OnlineKMS"> Online KMS</label>
+          </div>
+          <button class="btn" id="btnActivateWin">Kích hoạt Windows</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Kích hoạt Office</h3>
+        <div class="body">
+          <div class="methods" id="offMethods">
+            <label class="method"><input type="radio" name="offMethod" value="Ohook" checked> Ohook</label>
+            <label class="method"><input type="radio" name="offMethod" value="TSforge"> TSforge</label>
+            <label class="method"><input type="radio" name="offMethod" value="OnlineKMS"> Online KMS</label>
+          </div>
+          <button class="btn" id="btnActivateOffice">Kích hoạt Office</button>
+        </div>
+      </div>
+    </div>
+
+    <h3>Kết quả gần nhất</h3>
+    <div class="mono" id="lastLog">—</div>
+  </div>
+
+<script>
+async function renderStatus() {
+  const boxW = document.getElementById('winStatus');
+  const boxO = document.getElementById('offStatus');
+  boxW.innerHTML = 'Đang lấy thông tin...';
+  boxO.innerHTML = 'Đang lấy thông tin...';
+
+  const res = await window.electronAPI.getActivationStatus();
+  if (!res?.success) {
+    boxW.innerHTML = '<span style="color:#c00">Không đọc được trạng thái Windows.</span>';
+    boxO.innerHTML = '<span style="color:#c00">Không đọc được trạng thái Office.</span>';
+    return;
+  }
+  const w = res.data?.windows;
+  const o = res.data?.office || [];
+
+  if (w) {
+    boxW.innerHTML = `
+      <div class="kv"><b>Tên:</b> <span>${w.Name||'N/A'}</span></div>
+      <div class="kv"><b>Trạng thái:</b> <span>${w.LicenseStatus||'N/A'}</span></div>
+      <div class="kv"><b>Activation ID:</b> <span>${w.ActivationID||'N/A'}</span></div>
+      <div class="kv"><b>Product Key Channel:</b> <span>${w.ProductKeyChannel||'N/A'}</span></div>
+      <div class="kv"><b>Hết hạn:</b> <span>${w.ExpirationInfo||'N/A'}</span></div>
+    `;
+  } else {
+    boxW.innerHTML = 'Không xác định được trạng thái Windows.';
+  }
+
+  if (o.length) {
+    boxO.innerHTML = o.map((it, idx) => `
+      <div style="border-bottom:1px dashed #eee;padding:6px 0">
+        <div class="kv"><b>SKU #${idx+1}:</b> <span>${it.LicenseName||'N/A'}</span></div>
+        <div class="kv"><b>Trạng thái:</b> <span>${it.LicenseStatus||'N/A'}</span></div>
+        <div class="kv"><b>Product Key Channel:</b> <span>${it.ProductKeyChannel||'N/A'}</span></div>
+        <div class="kv"><b>Hết hạn:</b> <span>${it.ExpirationInfo||'N/A'}</span></div>
+      </div>
+    `).join('');
+  } else {
+    boxO.innerHTML = 'Không tìm thấy Office hoặc không có thông tin kích hoạt.';
+  }
+}
+
+async function run(target) {
+  const method = document.querySelector(`input[name="${target==='windows'?'winMethod':'offMethod'}"]:checked`).value;
+  document.getElementById('lastLog').textContent = `Đang kích hoạt ${target} bằng ${method}...`;
+  const r = await window.electronAPI.runActivation({ target, method });
+  if (r?.success) {
+    document.getElementById('lastLog').textContent = r.raw || r.message || 'Thành công.';
+    // Sau khi kích hoạt xong -> cập nhật bảng trạng thái
+    await renderStatus();
+  } else {
+    document.getElementById('lastLog').textContent = `Lỗi: ${r?.message||'Không rõ'}`;
+  }
+}
+
+document.getElementById('btnActivateWin').addEventListener('click', ()=>run('windows'));
+document.getElementById('btnActivateOffice').addEventListener('click', ()=>run('office'));
+
+renderStatus(); // tự động cập nhật khi mở cửa sổ
+</script>
+</body>
+</html>

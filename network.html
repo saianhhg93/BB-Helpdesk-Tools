@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Thiết lập Mạng</title>
+    <style>
+        /* GIỮ NGUYÊN CSS NHƯ BẠN ĐANG DÙNG */
+        body { font-family: "Segoe UI", sans-serif; padding: 10px 25px; font-size: 14px; background-color: #f0f0f0; }
+        .container { display: flex; gap: 20px; }
+    .sidebar{flex:0 0 400px;max-width:400px}
+    .content{flex:1 1 auto;min-width:0}
+    .setting-group{margin-bottom:20px;background:#fff;padding:20px;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+    select,input[type="text"]{width:100%;box-sizing:border-box;border:1px solid #ccc;border-radius:4px;padding:8px}
+    button{padding:8px 15px;border:none;background:#0078d4;color:#fff;border-radius:4px;cursor:pointer}
+    button:hover{background:#005a9e}
+    #adapter-status{background:#fff;border-radius:10px;padding:8px}
+        .ip-settings { display: none; margin-top: 15px; }
+        .ip-settings input { margin-bottom: 10px; }
+        /* Bổ sung giao diện thẻ cho trạng thái */
+.section-title  { font-weight:700; font-size:16px; margin:14px 12px 8px; color:#0f172a; }
+.status-list    { display:grid; grid-template-columns:1fr; gap:8px; padding:0 8px 8px; }
+.status-item    { background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:8px 10px; }
+.status-label   { color:#374151; font-size:12.5px; }
+.status-value   { color:#111827; font-size:13.5px; font-weight:600; margin-top:2px; line-height:1.35; word-break:break-word; }
+.status-value.mono{ font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace; }
+.status-placeholder{ color:#6b7280; font-size:14px; padding:12px 16px; background:#fff; border:1px dashed #e5e7eb; border-radius:8px; }
+
+.badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:700;line-height:1.4}
+.badge.up{background:#dcfce7;color:#166534}
+.badge.disconnected{background:#ffe4e6;color:#9f1239}
+.badge.disabled{background:#e5e7eb;color:#374151}
+
+    </style>
+</head>
+<body>
+    <h1>Thiết lập Mạng</h1>
+    <div class="container">
+        <div class="sidebar">
+            <div class="setting-group">
+                <h3>Chọn Card Mạng</h3>
+                <select id="adapter-select"></select>
+            </div>
+            <div class="setting-group">
+                <h3>Hành động</h3>
+                <button id="toggle-adapter-btn" style="margin-right: 10px;">Tắt Card Mạng</button>
+            </div>
+            <div class="setting-group">
+                <h3>Cấu hình IP</h3>
+                <input type="radio" id="dhcp-auto" name="ip-config" value="auto" checked>
+                <label for="dhcp-auto">Nhận địa chỉ IP tự động (DHCP)</label><br>
+                <input type="radio" id="dhcp-static" name="ip-config" value="static">
+                <label for="dhcp-static">Sử dụng địa chỉ IP tĩnh</label>
+
+                <div id="static-ip-fields" class="ip-settings">
+                    <input type="text" id="ip-address" placeholder="IP address">
+                    <input type="text" id="subnet-mask" placeholder="Subnet mask">
+                    <input type="text" id="gateway" placeholder="Default gateway">
+                    <input type="text" id="pref-dns" placeholder="Preferred DNS server">
+                    <input type="text" id="alt-dns" placeholder="Alternate DNS server">
+                </div>
+                <button id="apply-ip-btn" style="margin-top: 15px;">Áp dụng</button>
+            </div>
+        </div>
+
+        <div class="content">
+            <div class="setting-group">
+                <h3>Trạng thái Card Mạng</h3>
+                <div id="adapter-status">Đang lấy thông tin card mạng...</div>
+            </div>
+        </div>
+    </div>
+
+<script>
+  const adapterSelect    = document.getElementById('adapter-select');
+  const adapterStatus    = document.getElementById('adapter-status');
+  const toggleAdapterBtn = document.getElementById('toggle-adapter-btn');
+  const staticIpFields   = document.getElementById('static-ip-fields');
+  const applyIpBtn       = document.getElementById('apply-ip-btn');
+
+  // ---- state ----
+  const state = { adapters: [], currentIfIndex: null, currentStatus: null };
+
+  // ---- helpers ----
+  const safeParseJson = (t) => { try { return JSON.parse(t); } catch {
+    const m = t && t.toString().match(/(\{[\s\S]*\}|\[[\s\S]*\])\s*$/);
+    if (m) { try { return JSON.parse(m[0]); } catch {} } return null; } };
+
+  const fmt = v => (Array.isArray(v) ? v.filter(Boolean).join('<br>') : (v ?? '—'));
+  const addItem = (label, value) => `
+    <div class="status-item">
+      <div class="status-label">${label}</div>
+      <div class="status-value">${value}</div>
+    </div>`;
+  const mapStatus = (raw) => {
+    const s = String(raw || '').toLowerCase();
+    if (s.includes('up'))         return { text:'Up',          cls:'up' };
+    if (s.includes('disabled'))   return { text:'Disabled',    cls:'disabled' };
+    if (s.includes('disconnect')) return { text:'Disconnected',cls:'disconnected' };
+    return { text: raw || 'Unknown', cls:'disabled' };
+  };
+  const statusFromList = (ifIndex) => {
+    const a = state.adapters.find(x => String(x.ifIndex) === String(ifIndex));
+    return a?.Status || null;
+  };
+  function setActionButtonByStatus() {
+    const s = String(state.currentStatus || '').toLowerCase();
+    if (s.includes('disabled')) {
+      toggleAdapterBtn.textContent = 'Bật Card Mạng';
+      toggleAdapterBtn.dataset.action = 'enable';
+    } else {
+      toggleAdapterBtn.textContent = 'Tắt Card Mạng';
+      toggleAdapterBtn.dataset.action = 'disable';
+    }
+  }
+
+  // ---- load adapters & first details ----
+  async function initialize() {
+    const rs = await window.electronAPI.getNetworkAdapters();
+    if (!(rs?.success && rs.data)) {
+      adapterStatus.textContent = 'Không thể lấy danh sách card mạng.'; return;
+    }
+    const data = safeParseJson(rs.data);
+    state.adapters = Array.isArray(data) ? data : [data];
+
+    adapterSelect.innerHTML = '';
+    if (!state.adapters.length) {
+      adapterStatus.textContent = 'Không tìm thấy card mạng vật lý nào.'; return;
+    }
+    state.adapters.forEach(a => {
+      adapterSelect.add(new Option(`${a.InterfaceDescription} (${a.Status})`, a.ifIndex));
+    });
+
+    state.currentIfIndex = state.adapters[0].ifIndex;
+    state.currentStatus  = statusFromList(state.currentIfIndex);
+    adapterSelect.value  = state.currentIfIndex;
+    setActionButtonByStatus();
+
+    await loadAdapterDetails(state.currentIfIndex);
+  }
+
+  // ---- render details (UI thẻ) ----
+  async function loadAdapterDetails(ifIndex) {
+    if (!ifIndex || ifIndex === 'undefined') {
+      adapterStatus.innerHTML = '<div class="status-placeholder">Vui lòng chọn một card mạng hợp lệ.</div>';
+      return;
+    }
+
+    // Cập nhật nhãn nút sớm từ danh sách (phòng khi details fail vì Disabled)
+    state.currentStatus = statusFromList(ifIndex);
+    setActionButtonByStatus();
+
+    const result = await window.electronAPI.getAdapterDetails(ifIndex);
+    if (!(result?.success && result.data)) {
+      adapterStatus.innerHTML = '<div class="status-placeholder">Không thể lấy thông tin chi tiết.</div>';
+      return;
+    }
+
+    try {
+      const d  = safeParseJson(result.data) || {};
+      const st = mapStatus(d.Status);
+      state.currentIfIndex = ifIndex;
+      state.currentStatus  = st.text;
+      setActionButtonByStatus();
+
+      const isWifi = !!d.SSID;
+      const html = `
+        <div class="section-title">Trạng thái</div>
+        <div class="status-list">
+          ${addItem('Status', `<span class="badge ${st.cls}">${st.text}</span>`)}
+          ${addItem('Adapter', fmt(d.Name))}
+          ${addItem('Interface', fmt(d.InterfaceDesc))}
+          ${addItem('Physical address (MAC)', `<span class="mono">${fmt(d.MacAddress)}</span>`)}
+        </div>
+
+        <div class="section-title">IP assignment</div>
+        <div class="status-list">
+          ${addItem('IP assignment', fmt(d.IPAssignment))}
+          ${addItem('DNS server assignment', fmt(d.DnsAssignment || '—'))}
+          ${addItem('IPv4 DNS servers', `<span class="mono">${fmt(d.IPv4DNS)}</span>`)}
+          ${addItem('IPv4 address', `<span class="mono">${fmt(d.IPv4Address)}</span>`)}
+          ${addItem('IPv4 default gateway', `<span class="mono">${fmt(d.IPv4Gateway)}</span>`)}
+        </div>
+
+        ${isWifi ? `
+          <div class="section-title">Wi-Fi</div>
+          <div class="status-list">
+            ${addItem('SSID', fmt(d.SSID))}
+            ${addItem('Protocol', fmt(d.Protocol))}
+          </div>` : ''}
+
+        <div class="section-title">Network</div>
+        <div class="status-list">
+          ${addItem('Link speed (Receive/Transmit)', fmt(d.LinkSpeed || '—'))}
+          ${addItem('Driver info', fmt(d.DriverInfo || '—'))}
+        </div>`;
+      adapterStatus.innerHTML = html;
+    } catch (err) {
+      adapterStatus.innerHTML = '<div class="status-placeholder">Lỗi xử lý thông tin chi tiết card mạng.</div>';
+      console.error(err);
+    }
+  }
+
+  // ---- events ----
+  document.addEventListener('DOMContentLoaded', initialize);
+  adapterSelect.addEventListener('change', async (e) => {
+    state.currentIfIndex = e.target.value;
+    state.currentStatus  = statusFromList(state.currentIfIndex);
+    setActionButtonByStatus();
+    await loadAdapterDetails(state.currentIfIndex);
+  });
+
+  // Enable/Disable (đã hoạt động tốt với main.js hiện tại)
+  toggleAdapterBtn.addEventListener('click', async () => {
+    if (!state.currentIfIndex) return;
+    const isEnable = (toggleAdapterBtn.dataset.action === 'enable');
+
+    const old = toggleAdapterBtn.textContent;
+    toggleAdapterBtn.disabled = true;
+    toggleAdapterBtn.textContent = isEnable ? 'Đang bật...' : 'Đang tắt...';
+
+    const rs = await window.electronAPI.setAdapterState({
+      ifIndex: state.currentIfIndex,
+      isEnabled: isEnable
+    }).catch(err => ({ success:false, message:String(err) }));
+
+    toggleAdapterBtn.disabled = false;
+    toggleAdapterBtn.textContent = old;
+
+    // Refresh lại danh sách + chi tiết
+    const keep = state.currentIfIndex;
+    await (async function refreshAdaptersAndDetails(keepIfIndex){
+      const r = await window.electronAPI.getNetworkAdapters();
+      if (!(r?.success && r.data)) return;
+      const d = safeParseJson(r.data);
+      state.adapters = Array.isArray(d) ? d : [d];
+      adapterSelect.innerHTML = '';
+      state.adapters.forEach(a => adapterSelect.add(new Option(`${a.InterfaceDescription} (${a.Status})`, a.ifIndex)));
+      if (!state.adapters.length) return;
+      const target = state.adapters.some(a => String(a.ifIndex) === String(keepIfIndex)) ? keepIfIndex : state.adapters[0].ifIndex;
+      adapterSelect.value = target;
+      state.currentIfIndex = target;
+      state.currentStatus  = statusFromList(target);
+      setActionButtonByStatus();
+      await loadAdapterDetails(target);
+    })(keep);
+  });
+
+  // IP động/tĩnh
+  document.querySelectorAll('input[name="ip-config"]').forEach(r => {
+    r.addEventListener('change', e => staticIpFields.style.display = (e.target.value === 'static') ? 'block' : 'none');
+  });
+  applyIpBtn.addEventListener('click', async () => {
+  const ifIndex = adapterSelect.value;
+  const isStatic = document.getElementById('dhcp-static').checked;
+
+  let rs;
+  if (isStatic) {
+    const ipData = {
+      interfaceIndex: ifIndex,
+      ipAddress:  document.getElementById('ip-address').value.trim(),
+      subnetMask: document.getElementById('subnet-mask').value.trim(),
+      gateway:    document.getElementById('gateway').value.trim(),
+      dnsServers: [
+        document.getElementById('pref-dns').value.trim(),
+        document.getElementById('alt-dns').value.trim()
+      ].filter(Boolean)
+    };
+    rs = await window.electronAPI.setStaticIp(ipData).catch(err => ({success:false, message:String(err)}));
+  } else {
+    rs = await window.electronAPI.setDynamicIp(ifIndex).catch(err => ({success:false, message:String(err)}));
+  }
+
+  if (!rs || rs.success === false) {
+    alert('Cấu hình IP không thành công.\n' + (rs?.message || ''));
+  } else {
+    // Làm gọn UI: cuộn lên trạng thái và refresh
+    adapterStatus.scrollIntoView({ behavior:'smooth', block:'nearest' });
+
+    // refresh lại danh sách + chi tiết (giữ card hiện tại)
+    const keep = ifIndex;
+    await (async function refreshAdaptersAndDetails(keepIfIndex){
+      const r = await window.electronAPI.getNetworkAdapters();
+      if (!(r?.success && r.data)) return;
+      const d = safeParseJson(r.data);
+      state.adapters = Array.isArray(d) ? d : [d];
+      adapterSelect.innerHTML = '';
+      state.adapters.forEach(a => adapterSelect.add(new Option(`${a.InterfaceDescription} (${a.Status})`, a.ifIndex)));
+      if (!state.adapters.length) return;
+      const target = state.adapters.some(a => String(a.ifIndex) === String(keepIfIndex)) ? keepIfIndex : state.adapters[0].ifIndex;
+      adapterSelect.value = target;
+      state.currentIfIndex = target;
+      state.currentStatus  = statusFromList(target);
+      setActionButtonByStatus();
+      await loadAdapterDetails(target);
+    })(keep);
+  }
+});
+</script>
+
+</body>
+</html>

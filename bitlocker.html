@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <title>Quản lý BitLocker</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <style>
+    :root { --red:#d9534f; --muted:#999; }
+    body { font-family: Inter, "Segoe UI", Arial, sans-serif; margin:0; background:#f6f7f9; }
+    .wrap { max-width: 800px; margin: 20px auto; background:#fff; border-radius:10px;
+            box-shadow:0 6px 20px rgba(0,0,0,.06); padding:18px; }
+    h1 { margin: 0 0 12px; font-size: 18px; }
+    .toolbar { display:flex; gap:8px; align-items:center; margin-bottom:10px; flex-wrap:wrap; }
+    .toolbar .spacer { flex:1; }
+    .btn { border:1px solid #ddd; background:#fafafa; padding:8px 12px; border-radius:8px;
+           cursor:pointer; font-size:14px; }
+    .btn:hover { background:#f0f0f0; }
+    .btn.primary { border-color:#c9302c; background:#e34b44; color:#fff; }
+    .btn.primary:hover { background:#d6423b; }
+    .btn.warn { border-color:#888; }
+
+    .grid { border:1px solid #eee; border-radius:10px; overflow:hidden; }
+    .row { display:grid; grid-template-columns: 56px 90px 1fr 130px 110px 110px;
+           gap:10px; padding:10px 12px; border-top:1px solid #f1f1f1; align-items:center; }
+    .row.header { background:#fafafa; font-weight:600; border-top:none; }
+    .row.dim { color:#aaa; background:#fcfcfc; }
+    .row input[type="checkbox"] { width:18px; height:18px; }
+    .badge { display:inline-block; font-size:12px; padding:3px 7px; border-radius:999px; border:1px solid #ddd; }
+    .badge.on    { background:#fff4f2; border-color:#f4b3ae; color:#b1221b; }
+    .badge.off   { background:#f3f5f8; color:#556; }
+    .footer { display:flex; justify-content:flex-end; gap:10px; margin-top:12px; }
+    .muted { color:#777; font-size:12px; }
+    .pathbox { display:flex; gap:8px; align-items:center; }
+    .pathbox input { flex:1; padding:8px; border:1px solid #ddd; border-radius:8px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Quản lý BitLocker</h1>
+
+    <div class="toolbar">
+      <button class="btn" id="refresh-btn">Quét lại</button>
+      <div class="spacer"></div>
+      <div class="pathbox">
+        <span class="muted">Thư mục lưu key:</span>
+        <input id="key-dir" type="text" />
+        <button class="btn" id="pick-dir">Chọn</button>
+      </div>
+    </div>
+
+    <div class="grid" id="grid">
+      <div class="row header">
+        <div></div>
+        <div>Ổ</div>
+        <div>Nhãn / Hệ thống tệp</div>
+        <div>Trạng thái</div>
+        <div>Mã hóa (%)</div>
+        <div>Tự mở khóa</div>
+      </div>
+      <!-- rows will be injected here -->
+    </div>
+
+    <div class="footer">
+      <button class="btn warn" id="backup-btn">Sao lưu key</button>
+      <button class="btn primary" id="disable-btn">Tắt BitLocker</button>
+    </div>
+
+    <p class="muted" style="margin-top:8px">
+      * Ổ **không có BitLocker** sẽ bị làm mờ và không thể chọn.<br/>
+      * “Tắt BitLocker” sẽ bắt đầu giải mã nền; bạn có thể “Quét lại” để xem tiến độ.
+    </p>
+  </div>
+
+<script>
+(() => {
+  // Ghép "E:\BB_Backup" + "bitkey" => "E:\BB_Backup\bitkey" (loại bỏ slash thừa)
+  function joinWinPath(base, sub) {
+    const cleanBase = String(base || '').replace(/[\\\/]+$/, '');
+    const cleanSub  = String(sub  || '').replace(/^[\\\/]+/, '');
+    return cleanBase ? (cleanBase + '\\' + cleanSub) : cleanSub;
+  }
+
+  const keyDirInput = document.getElementById('key-dir');
+
+  async function initKeyDir() {
+    // Lấy thư mục backup người dùng đang chọn ở trang chính
+    let base = await window.electronAPI.getBackupDir();
+    if (!base) base = 'D:\\BB_Backup'; // fallback
+    keyDirInput.value = joinWinPath(base, 'bitkey'); // ví dụ: E:\BB_Backup\bitkey
+  }
+
+  // Tự cập nhật khi người dùng đổi “Thư mục sao lưu backup” ở trang chính
+  const off = window.electronAPI.onBackupDirUpdated((dir) => {
+    keyDirInput.value = joinWinPath(dir, 'bitkey');
+  });
+
+  // Gọi khi mở trang
+  initKeyDir();
+
+  // (tuỳ chọn) nếu bạn có nút "Chọn" ngay trong BitLocker để đổi riêng thư mục lưu key:
+  document.getElementById('pick-dir')?.addEventListener('click', async () => {
+    const picked = await window.electronAPI.openDirectory();
+    if (picked) keyDirInput.value = joinWinPath(picked, 'bitkey'); // vẫn thêm \bitkey
+  });
+
+  // (tuỳ chọn) khi đóng trang có thể gọi off() để huỷ lắng nghe sự kiện
+})();
+
+(async function () {
+  // 1) Kiểm tra quyền admin
+  try {
+    const isAdmin = await window.electronAPI.isAdmin();
+    if (!isAdmin) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Cần chạy bằng quyền Quản trị (Administrator)',
+        html: 'Một số thao tác BitLocker sẽ thất bại nếu không có quyền admin. ' +
+              'Vui lòng <b>đóng app</b> và <b>mở lại bằng Run as administrator</b>.',
+        confirmButtonText: 'Đã hiểu'
+      });
+    }
+  } catch {}
+
+  const grid = document.getElementById('grid');
+  const keyDirInput = document.getElementById('key-dir');
+
+  document.getElementById('refresh-btn').addEventListener('click', load);
+  document.getElementById('backup-btn').addEventListener('click', backupSelected);
+  document.getElementById('disable-btn').addEventListener('click', disableSelected);
+
+  async function load() {
+    Swal.fire({ title:'Đang quét ổ đĩa...', didOpen: () => Swal.showLoading(), allowOutsideClick:false });
+    const res = await window.electronAPI.scanBitLocker();
+    Swal.close();
+
+    if (!res?.success) {
+      return Swal.fire({ icon:'error', title:'Lỗi quét BitLocker', text: res?.message || 'Không rõ nguyên nhân' });
+    }
+
+    // Xóa các dòng cũ
+    [...grid.querySelectorAll('.row.item')].forEach(el => el.remove());
+
+    res.data.forEach(v => {
+      const canPick = (String(v.ProtectionStatus).toLowerCase() === 'on' || v.IsBitLocker === true);
+      const row = document.createElement('div');
+      row.className = 'row item' + (canPick ? '' : ' dim');
+
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.dataset.drive = v.Drive;
+      cb.disabled = !canPick;
+
+      const c0 = document.createElement('div'); c0.appendChild(cb);
+      const c1 = document.createElement('div'); c1.textContent = v.Drive;
+      const c2 = document.createElement('div'); c2.innerHTML =
+        `<div><b>${v.Label || '(Không nhãn)'}</b></div><div class="muted">${v.FileSystem || ''} • ${v.SizeGB ?? '?'} GB</div>`;
+      const c3 = document.createElement('div'); c3.innerHTML =
+        `<span class="badge ${canPick ? 'on' : 'off'}">${canPick ? 'BitLocker: On' : 'BitLocker: Off'}</span>`;
+      const c4 = document.createElement('div'); c4.textContent = (v.EncryptionPercentage ?? '-') + '%';
+      const c5 = document.createElement('div'); c5.textContent = v.AutoUnlockEnabled ? 'Bật' : 'Tắt';
+
+      row.append(c0,c1,c2,c3,c4,c5);
+      grid.appendChild(row);
+    });
+  }
+
+  function selectedDrives() {
+    return [...grid.querySelectorAll('.row.item input[type="checkbox"]:checked')]
+      .map(x => x.dataset.drive);
+  }
+
+  async function backupSelected() {
+    const drives = selectedDrives();
+    if (drives.length === 0) {
+      return Swal.fire({ icon:'info', title:'Chưa chọn ổ nào', text:'Hãy tick chọn ít nhất 1 ổ có BitLocker.' });
+    }
+    const outputDir = keyDirInput.value.trim();
+    if (!outputDir) {
+      return Swal.fire({ icon:'info', title:'Chưa chọn thư mục lưu key', text:'Hãy chọn thư mục lưu khoá khôi phục.' });
+    }
+
+    Swal.fire({ title:'Đang sao lưu key...', didOpen: () => Swal.showLoading(), allowOutsideClick:false });
+    const res = await window.electronAPI.backupBitLockerKeys({ drives, outputDir });
+    Swal.close();
+
+    if (!res?.success) {
+      return Swal.fire({ icon:'error', title:'Sao lưu thất bại', html: res?.message || 'Không rõ nguyên nhân' });
+    }
+    const files = (res.files || []).map(f => `<li><code>${f}</code></li>`).join('');
+    Swal.fire({ icon:'success', title:'Đã sao lưu key', html: files ? `<ul>${files}</ul>` : 'Thành công.' });
+  }
+
+  async function disableSelected() {
+    const drives = selectedDrives();
+    if (drives.length === 0) {
+      return Swal.fire({ icon:'info', title:'Chưa chọn ổ nào', text:'Hãy tick chọn ít nhất 1 ổ có BitLocker.' });
+    }
+
+    const { isConfirmed } = await Swal.fire({
+      icon:'warning',
+      title: 'Xác nhận tắt BitLocker',
+      html: 'Quá trình giải mã có thể mất thời gian và chạy nền. Bạn có muốn bắt đầu không?',
+      showCancelButton:true,
+      confirmButtonText:'Bắt đầu',
+      cancelButtonText:'Huỷ'
+    });
+    if (!isConfirmed) return;
+
+    Swal.fire({ title:'Đang gửi lệnh tắt BitLocker...', didOpen: () => Swal.showLoading(), allowOutsideClick:false });
+    const res = await window.electronAPI.disableBitLocker(drives);
+    Swal.close();
+
+    if (!res?.success) {
+      return Swal.fire({ icon:'error', title:'Không thể tắt BitLocker', html: res?.message || 'Không rõ nguyên nhân' });
+    }
+    Swal.fire({
+      icon:'success',
+      title:'Đã gửi lệnh giải mã',
+      html:'Tiến độ sẽ tiếp tục chạy nền. Bạn có thể nhấn <b>Quét lại</b> để xem phần trăm mã hoá.'
+    });
+    await load();
+  }
+
+  await load();
+})();
+</script>
+</body>
+</html>
