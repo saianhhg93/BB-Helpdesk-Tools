@@ -1,5 +1,5 @@
 // main.js
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, nativeImage } = require('electron');
 const path = require('path');
 // THAY ĐỔI: Chuyển 'spawn' vào dòng 'require' đã có sẵn
 const { exec, spawn } = require('child_process');
@@ -14,6 +14,29 @@ let bloatwareWin;
 let bitlockerWin;
 let backupDir = 'D:\\BB_Backup'; // mặc định; sau có thể load từ file config nếu muốn
 let activationWin;
+let __settingsCache = null;
+let __settingsCacheAt = 0;
+
+// Icon
+app.setAppUserModelId('com.baobeo.bbhelpdesktools');
+function resolveWinIcon() {
+  const dev  = path.join(__dirname, 'assets', 'icons', 'win', 'app.ico');
+  const prod = path.join(process.resourcesPath || '', 'assets', 'icons', 'win', 'app.ico');
+  if (fs.existsSync(dev))  return dev;
+  if (fs.existsSync(prod)) return prod;
+  return undefined;
+}
+
+// Tạo NativeImage để chắc chắn Electron đọc được ICO
+const APP_ICON = (() => {
+  const p = resolveWinIcon();
+  if (!p) { console.warn('[ICON] not found'); return undefined; }
+  const img = nativeImage.createFromPath(p);
+  if (img.isEmpty()) { console.warn('[ICON] invalid or unreadable:', p); return undefined; }
+  const { width, height } = img.getSize();
+  console.log(`[ICON] loaded ${p} -> ${width}x${height}`);
+  return img;  // có thể pass trực tiếp NativeImage
+})();
 
 // Hàm thực thi PowerShell an toàn (đã sửa lại để dùng spawn và encodedCommand)
 
@@ -49,107 +72,51 @@ function runExeCommand(command) {
     });
 }
 
-// Trả về đường dẫn asset đúng ở dev/packaged
-function runtimeAsset(p) {
-  return app.isPackaged ? path.join(process.resourcesPath, p) : path.join(__dirname, p);
-}
-function runtimeIcon() {
-  const p = runtimeAsset('icon.ico');
-  return fs.existsSync(p) ? p : undefined;    // có thì dùng, không có thì để Electron tự fallback
-}
+const createWindow = () => {
+  win = new BrowserWindow({ width: 800, height: 650, resizable: true, icon: APP_ICON, webPreferences: { preload: path.join(__dirname, 'preload.js') } });
+  win.setMenu(null);
+  win.setTitle('BB Helpdesk Tools');
+  win.loadFile('index.html');
+};
 
-// ========== MAIN WINDOW ==========
-function createWindow() {
-  win = new BrowserWindow({
-    width: 900,
-    height: 650,
-    show: false,                   // chỉ show khi sẵn sàng
-    icon: runtimeIcon(),
-    frame: true,
-    titleBarStyle: 'default',
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: false
-    }
-  });
-
-  win.once('ready-to-show', () => {
-    if (win.isMinimized()) win.restore();
-    win.center();
-    win.show();
-    win.focus();
-  });
-
-  win.webContents.on('did-fail-load', (_e, code, desc, url) => {
-    console.error('Main did-fail-load:', code, desc, url);
-    win.loadURL('data:text/html,' + encodeURIComponent(`<h2>Load thất bại: ${code} - ${desc}</h2>`));
-  });
-
-  win.loadFile('index.html').catch(err => console.error('Main loadFile error:', err));
-}
-
-// ========== FACTORY CHUNG TẠO WINDOW CON ==========
-function createChild({ width, height, html, modal = true }) {
-  const w = new BrowserWindow({
-    width, height,
-    parent: win,
-    modal,
-    show: false,
-    icon: runtimeIcon(),
-    frame: true,
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: false
-    }
-  });
-  w.setMenu(null);
-  w.once('ready-to-show', () => { w.show(); w.focus(); });
-  w.webContents.on('did-fail-load', (_e, c, d, u) => {
-    console.error(`Child(${html}) did-fail-load:`, c, d, u);
-    w.loadURL('data:text/html,' + encodeURIComponent(`<h2>Load ${html} thất bại: ${c} - ${d}</h2>`));
-  });
-  w.loadFile(html).catch(err => console.error(`Child(${html}) loadFile error:`, err));
-  return w;
-}
-
-// ========== CỬA SỔ CON ==========
 function createSettingsWindow() {
-  if (settingsWin && !settingsWin.isDestroyed()) { settingsWin.show(); settingsWin.focus(); return; }
-  settingsWin = createChild({ width: 650, height: 800, html: 'settings.html' });
+  settingsWin = new BrowserWindow({ width: 650, height: 800, parent: win, modal: true, icon: APP_ICON, webPreferences: { preload: path.join(__dirname, 'preload.js') } });
+  settingsWin.setMenu(null);
+  settingsWin.loadFile('settings.html');
 }
 
 function createBitLockerWindow() {
-  if (bitlockerWin && !bitlockerWin.isDestroyed()) { bitlockerWin.show(); bitlockerWin.focus(); return; }
-  bitlockerWin = createChild({ width: 860, height: 700, html: 'bitlocker.html' });
+  bitlockerWin = new BrowserWindow({
+    width: 860,
+    height: 700,
+    parent: win,
+    modal: true,
+    icon: APP_ICON,
+    webPreferences: { preload: path.join(__dirname, 'preload.js') }
+  });
+  bitlockerWin.setMenu(null);
+  bitlockerWin.loadFile('bitlocker.html');
 }
+ipcMain.on('open-bitlocker-window', () => createBitLockerWindow());
 
 function createActivationWindow() {
-  if (activationWin && !activationWin.isDestroyed()) { activationWin.show(); activationWin.focus(); return; }
-  activationWin = createChild({ width: 900, height: 760, html: 'activation.html' });
-}
-
-// ========== BOOTSTRAP ==========
-const gotLock = app.requestSingleInstanceLock();
-if (!gotLock) {
-  app.quit();
-} else {
-  app.whenReady().then(() => {
-    app.setAppUserModelId('com.baobeo.bbhelpdesktools');
-    createWindow();
+  activationWin = new BrowserWindow({
+    width: 900, height: 760, parent: win, modal: true, icon: APP_ICON,
+    webPreferences: { preload: path.join(__dirname, 'preload.js') }
   });
-
-  app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
-  app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
+  activationWin.setMenu(null);
+  activationWin.loadFile('activation.html');
 }
-
-// ========== IPC ==========
-ipcMain.on('open-settings-window', () => createSettingsWindow());
-ipcMain.on('open-bitlocker-window', () => createBitLockerWindow());
 ipcMain.on('open-activation-window', () => createActivationWindow());
+
+app.whenReady().then(() => {
+  createWindow();
+  app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
+});
+
+app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
+
+ipcMain.on('open-settings-window', () => createSettingsWindow());
 
 // Mở dialog chọn thư mục (để preload.openDirectory() hoạt động)
 ipcMain.handle('dialog:openDirectory', async () => {
@@ -177,21 +144,53 @@ ipcMain.on('backup:set-dir', (_e, dir) => {
 // === IPC Handlers cho Cửa sổ Settings và các chức năng khác ===
 
 ipcMain.handle('get-all-settings', async () => {
-    const commands = {
-        uac: `(Get-ItemProperty -Path "HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System" -Name "EnableLUA").EnableLUA`,
-        firewall: `(Get-NetFirewallProfile -Name Public).Enabled`,
-        windowsUpdate: `(Get-Service -Name wuauserv).StartType`,
-        explorer: `(Get-ItemProperty -Path "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" -Name "LaunchTo" -ErrorAction SilentlyContinue).LaunchTo`,
-        search: `(Get-ItemProperty -Path "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Search" -Name "SearchboxTaskbarMode" -ErrorAction SilentlyContinue).SearchboxTaskbarMode`,
-        powerMode: `(powercfg /getactivescheme).Split(' ')[3]`
-    };
+  // cache 3 giây để lần mở lại gần sau cực nhanh
+  if (__settingsCache && (Date.now() - __settingsCacheAt < 3000)) {
+    return __settingsCache;
+  }
 
-    let settings = {};
-    for (const key in commands) {
-        const result = await runPowerShellCommand(commands[key]);
-        settings[key] = result.data;
-    }
-    return settings;
+  const ps = `
+$ErrorActionPreference='SilentlyContinue'
+function ReadReg($Path,$Name){ try { (Get-ItemProperty -Path $Path -Name $Name -ErrorAction Stop).$Name } catch { $null } }
+
+# UAC
+$uac = ReadReg 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System' 'EnableLUA'
+
+# Firewall (nhẹ hơn Get-NetFirewallProfile)
+$fwDomain  = ReadReg 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\SharedAccess\\Parameters\\FirewallPolicy\\DomainProfile'  'EnableFirewall'
+$fwPrivate = ReadReg 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\SharedAccess\\Parameters\\FirewallPolicy\\StandardProfile' 'EnableFirewall'
+$fwPublic  = ReadReg 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\SharedAccess\\Parameters\\FirewallPolicy\\PublicProfile'   'EnableFirewall'
+$fwAllOn   = ($fwDomain -eq 1) -and ($fwPrivate -eq 1) -and ($fwPublic -eq 1)
+
+# Windows Update (đọc Start của dịch vụ để tránh Get-Service)
+$wuaStart = ReadReg 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\wuauserv' 'Start'
+$wuaTxt = switch ($wuaStart) { 4 {'Disabled'} 2 {'Automatic'} 3 {'Manual'} default { $null } }
+
+# Explorer + Search
+$explorer = ReadReg 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced' 'LaunchTo'
+$search   = ReadReg 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Search' 'SearchboxTaskbarMode'
+
+# Power plan (gọi 1 lần powercfg & parse GUID)
+$schemeRaw = (powercfg /getactivescheme) 2>$null
+$scheme = if ($schemeRaw -match '\\{([0-9a-fA-F\\-]+)\\}') { $matches[1].ToLower() } else { $null }
+
+[pscustomobject]@{
+  uac          = if ($uac -ne $null) { [string]$uac } else { $null }
+  firewall     = if ($fwAllOn) { 'True' } else { 'False' }
+  windowsUpdate= $wuaTxt
+  explorer     = if ($explorer -ne $null) { [string]$explorer } else { $null }
+  search       = if ($search -ne $null) { [string]$search } else { $null }
+  powerMode    = $scheme
+} | ConvertTo-Json -Compress
+`;
+  const r = await runPowerShellCommand(ps);
+  if (!r?.success) return {};
+
+  let obj = {};
+  try { obj = JSON.parse(r.data || '{}'); } catch {}
+  __settingsCache = obj;
+  __settingsCacheAt = Date.now();
+  return obj;
 });
 
 ipcMain.handle('set-toggle-status', (e, { feature, isEnabled }) => {
@@ -251,29 +250,10 @@ ipcMain.handle('get-system-info', async () => {
 
 // Hàm tạo cửa sổ Thiết lập Mạng
 function createNetworkWindow() {
-  if (networkWin && !networkWin.isDestroyed()) { networkWin.show(); networkWin.focus(); return; }
-
-  networkWin = new BrowserWindow({
-    width: 850,
-    height: 800,
-    parent: win,
-    modal: true,
-    show: false,
-    icon: runtimeIcon(),                // << thêm icon
-    frame: true,
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: false
-    }
-  });
-
+  networkWin = new BrowserWindow({ width: 850, height: 800, parent: win, modal: true, icon: APP_ICON, webPreferences: { preload: path.join(__dirname, 'preload.js') } });
   networkWin.setMenu(null);
-  networkWin.once('ready-to-show', () => { networkWin.show(); networkWin.focus(); });
   networkWin.loadFile('network.html');
 }
-
 
 // Lắng nghe lệnh mở cửa sổ mạng
 ipcMain.on('open-network-window', () => createNetworkWindow());
@@ -498,29 +478,16 @@ catch { throw $_.Exception.Message }
 // ======================== BLOATWARE IPC =======================
 
 function createBloatwareWindow() {
-  if (bloatwareWin && !bloatwareWin.isDestroyed()) { bloatwareWin.show(); bloatwareWin.focus(); return; }
-
   bloatwareWin = new BrowserWindow({
     width: 600,
     height: 750,
     parent: win,
-    modal: true,
-    show: false,
-    icon: runtimeIcon(),                // << thêm icon
-    frame: true,
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: false
-    }
+    modal: true, icon: APP_ICON,
+    webPreferences: { preload: path.join(__dirname, 'preload.js') }
   });
-
   bloatwareWin.setMenu(null);
-  bloatwareWin.once('ready-to-show', () => { bloatwareWin.show(); bloatwareWin.focus(); });
   bloatwareWin.loadFile('bloatware.html');
 }
-
 
 
 ipcMain.on('open-bloatware-window', () => {

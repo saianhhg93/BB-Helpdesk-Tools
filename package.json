@@ -23,12 +23,11 @@
         "filter": [
           "**/*"
         ]
-      },
-      { "from": "icon.ico",   "to": "icon.ico" }
+      }
     ],
     "win": {
       "target": "portable",
-      "icon": "icon.ico" 
+      "icon": "assets/icons/win/app.ico" 
     }
   }
 }
